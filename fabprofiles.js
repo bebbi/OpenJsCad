@@ -1,4 +1,5 @@
 /*
+ *
  * This file describes mappings from csg.js objects to fab devices.
  * Load this script in index.html
  *
@@ -25,6 +26,25 @@
  * again no clutter in csg.js
  *
  * ..and if I decide, I can even 3d print myCutObj.asCSG();
+ *
+ *
+ * in drawing main() function:
+ *
+ * // automatic integration with LaserObject:
+ * function main() {
+ *    // openjscad renderer knows to look for asCSG() and asFile() on unknown objects,
+ *    // renders the appropriate csg and presents appropriate exports
+ *    return myCutObj();
+ * }
+ * 
+ * // manual return scenarios
+ * function main() {
+ *     // like today: openjscad can render and export what it could before
+ *     return csg;
+ *     return [csg1, csg2];
+ *     // similar as matthijs, but dict
+ *     return {csg: csgFromUser, toFile: exportFuncFromUser};
+ * }
  */
 
  var LaserObject = function(engravedPaths, cutPaths, engravedAreas, thickness) {
@@ -52,14 +72,19 @@
 
     // re Change 1: here is where the exporters go
     // re Change 3: deal with line color here instead of csg.js
-    toDxf: function() {
-        var dxf = toRedStroke(this.engravedPaths_)
-            .concat(toblackStroke(this.cutPaths_))
-            .concat(tothinStroke(this.engraveAreas_.map(function(cag) {
-                return cag.getOutlinePaths();
-            })))
-            .serializeDxf();
-    },
+    asFile: [
+        {
+            label: 'dxf',
+            onCall: function() {
+                var dxf = toRedStroke(this.engravedPaths_)
+                    .concat(toblackStroke(this.cutPaths_))
+                    .concat(tothinStroke(this.engraveAreas_.map(function(cag) {
+                        return cag.getOutlinePaths();
+                    })))
+                    .serializeDxf();
+            }
+        }
+    ],
 
     getMakeTime: function(speed) {
         // proportional to paths length and fills area, plus maybe take laser power into account
