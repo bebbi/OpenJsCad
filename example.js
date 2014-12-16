@@ -57,7 +57,9 @@ CSG.CompositeObject.prototype = {
             this.renderers_[k] = renderers[k];
         }, this);
     },
-    // for openjscad.js consumption
+    // for openjscad.js consumption, could be extended to things like:
+    // this.getExport('dxf') // dxf,
+    // this.getExportKeys() // ['dxf', 'svg']
     getExport: function() {
         return this.exports_;
     },
