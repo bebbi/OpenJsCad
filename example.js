@@ -88,13 +88,13 @@ Helpers.MyCompositeObject = function(stuff) {
             return csg;
         },
         'dxf': function() {
-            var dxf = toRedStroke(this.stuff_.engravedPaths_)
+            var csg = toRedStroke(this.stuff_.engravedPaths_)
                 .concat(toblackStroke(this.stuff_.cutPaths_))
                 .concat(tothinStroke(this.stuff_.engraveAreas_.map(function(cag) {
                     return cag.getOutlinePaths();
                 })))
-                .serializeDxf();
-            return dxf;
+                .extrudeToCSG();
+            return csg;
         }
     });
 };
