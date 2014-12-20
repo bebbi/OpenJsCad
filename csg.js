@@ -977,8 +977,8 @@ for solid CAD anyway.
             return result;
         },
 
-        setColor: function(red, green, blue) {
-            var newshared = new CSG.Polygon.Shared([red, green, blue]);
+        setColor: function(red, green, blue, alpha) {
+            var newshared = new CSG.Polygon.Shared([red, green, blue, alpha || 1]);
             return this.setShared(newshared);
         },
 
