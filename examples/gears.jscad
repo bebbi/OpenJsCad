@@ -1,75 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head lang="en">
 
-    <meta charset="UTF-8">
-    <title>OpenCadJS based on Three.js</title>
-    <script src="three.min.js"></script>
-    <script src="csg.js"></script>
-    <script src="openjscad.js"></script>
-    <script src="trackballcontrols.js"></script>
-    <script src="threecsg.js"></script>
-
-    <script>
-        //TODO here all the code goes
-        var gProcessor=null;
-
-        // Show all exceptions to the user:
-        OpenJsCad.AlertUserOfUncaughtExceptions();
-
-        function onload()
-        {
-            gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
-            updateSolid();
-        }
-
-        function updateSolid()
-        {
-            gProcessor.setJsCad(document.getElementById('code').value);
-
-        }
-    </script>
-    <style>
-
-        body {
-            font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            max-width: 820px;
-            margin: 0 auto;
-            padding: 10px;
-        }
-
-        pre, code, textarea {
-            font: 12px/20px Monaco, monospace;
-            border: 1px solid #CCC;
-            border-radius: 3px;
-            background: #F9F9F9;
-            padding: 0 3px;
-            color: #555;
-        }
-        pre, textarea {
-            padding: 10px;
-            width: 100%;
-        }
-        textarea {
-            height: 200px;
-        }
-        textarea:focus {
-            outline: none;
-        }
-
-        canvas { cursor: move; }
-
-    </style>
-    <link rel="stylesheet" href="openjscad.css" type="text/css">
-
-</head>
-<body onload="onload()">
-
-    <h1>OpenJS Demo based on Three.js</h1><br>
-    <div id="viewer"></div><br>
-    <h2>Source code</h2>
-    <p>Below is the same source code that was used before. Thus, nothing is changed</p>
-    <textarea id="code">
 // Here we define the user editable parameters:
 function getParameterDefinitions() {
   return [
@@ -82,7 +11,7 @@ function getParameterDefinitions() {
   ];
 }
 
-// Main entry point; here we construct our solid:
+// Main entry point; here we construct our solid: 
 function main(params)
 {
   var gear = involuteGear(
@@ -101,23 +30,23 @@ function main(params)
 }
 
 /*
-  For gear terminology see:
+  For gear terminology see: 
     http://www.astronomiainumbria.org/advanced_internet_files/meccanica/easyweb.easynet.co.uk/_chrish/geardata.htm
   Algorithm based on:
     http://www.cartertools.com/involute.html
 
   circularPitch: The distance between adjacent teeth measured at the pitch circle
-*/
+*/ 
 function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickness)
 {
   // default values:
   if(arguments.length < 3) pressureAngle = 20;
   if(arguments.length < 4) clearance = 0;
   if(arguments.length < 4) thickness = 1;
-
+  
   var addendum = circularPitch / Math.PI;
   var dedendum = addendum + clearance;
-
+  
   // radiuses of the 4 circles:
   var pitchRadius = numTeeth * circularPitch / (2 * Math.PI);
   var baseRadius = pitchRadius * Math.cos(Math.PI * pressureAngle / 180);
@@ -140,13 +69,13 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
     // first side of the tooth:
     var angle = maxangle * i / resolution;
     var tanlength = angle * baseRadius;
-    var radvector = CSG.Vector2D.fromAngle(angle);
+    var radvector = CSG.Vector2D.fromAngle(angle);    
     var tanvector = radvector.normal();
     var p = radvector.times(baseRadius).plus(tanvector.times(tanlength));
     points[i+1] = p;
 
     // opposite side of the tooth:
-    radvector = CSG.Vector2D.fromAngle(angularToothWidthAtBase - angle);
+    radvector = CSG.Vector2D.fromAngle(angularToothWidthAtBase - angle);    
     tanvector = radvector.normal().negated();
     p = radvector.times(baseRadius).plus(tanvector.times(tanlength));
     points[2 * resolution + 2 - i] = p;
@@ -163,10 +92,10 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
     allteeth = allteeth.unionForNonIntersecting(rotatedtooth);
   }
 
-  // build the root circle:
+  // build the root circle:  
   points = [];
   var toothAngle = 2 * Math.PI / numTeeth;
-  var toothCenterAngle = 0.5 * angularToothWidthAtBase;
+  var toothCenterAngle = 0.5 * angularToothWidthAtBase; 
   for(var i = 0; i < numTeeth; i++)
   {
     var angle = toothCenterAngle + i * toothAngle;
@@ -184,7 +113,3 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
 
   return result;
 }
-    </textarea><br>
-
-</body>
-</html>
