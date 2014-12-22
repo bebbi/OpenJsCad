@@ -92,7 +92,7 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
             controls.update();
             renderer.render(scene, camera);
         } catch(error){
-            console.log(error);
+            console.log("mesh is not ready or empty");
         }
     };
 
@@ -141,6 +141,9 @@ OpenJsCad.Viewer.prototype = {
         // empty mesh list:
         this.meshes = [];
         this.onDraw();
+
+
+
     },
 
     supported: function() {
@@ -382,8 +385,8 @@ OpenJsCad.parseJsCadScriptSync = function(script, mainParameters, debugging) {
 // callback: should be function(error, csg)
 OpenJsCad.parseJsCadScriptASync = function(script, mainParameters, options, callback) {
     var baselibraries = [
-        "csg.js",
-        "openjscad.js"
+        "../src/csg.js",
+        "../src/openjscad.js"
     ];
 
     var baseurl = document.location.href.replace(/\?.*$/, '');
@@ -1323,71 +1326,4 @@ OpenJsCad.Processor.prototype = {
         this.paramControls = paramControls;
     }
 };
-
-/**
- * @author alteredq / http://alteredqualia.com/
- * @author mr.doob / http://mrdoob.com/
- */
-
-var Detector = {
-
-    canvas: !! window.CanvasRenderingContext2D,
-    webgl: ( function () { try { var canvas = document.createElement( 'canvas' ); return !! ( window.WebGLRenderingContext && ( canvas.getContext( 'webgl' ) || canvas.getContext( 'experimental-webgl' ) ) ); } catch( e ) { return false; } } )(),
-    workers: !! window.Worker,
-    fileapi: window.File && window.FileReader && window.FileList && window.Blob,
-
-    getWebGLErrorMessage: function () {
-
-        var element = document.createElement( 'div' );
-        element.id = 'webgl-error-message';
-        element.style.fontFamily = 'monospace';
-        element.style.fontSize = '13px';
-        element.style.fontWeight = 'normal';
-        element.style.textAlign = 'center';
-        element.style.background = '#fff';
-        element.style.color = '#000';
-        element.style.padding = '1.5em';
-        element.style.width = '400px';
-        element.style.margin = '5em auto 0';
-
-        if ( ! this.webgl ) {
-
-            element.innerHTML = window.WebGLRenderingContext ? [
-                'Your graphics card does not seem to support <a href="http://khronos.org/webgl/wiki/Getting_a_WebGL_Implementation" style="color:#000">WebGL</a>.<br />',
-                'Find out how to get it <a href="http://get.webgl.org/" style="color:#000">here</a>.'
-            ].join( '\n' ) : [
-                'Your browser does not seem to support <a href="http://khronos.org/webgl/wiki/Getting_a_WebGL_Implementation" style="color:#000">WebGL</a>.<br/>',
-                'Find out how to get it <a href="http://get.webgl.org/" style="color:#000">here</a>.'
-            ].join( '\n' );
-
-        }
-
-        return element;
-
-    },
-
-    addGetWebGLMessage: function ( parameters ) {
-
-        var parent, id, element;
-
-        parameters = parameters || {};
-
-        parent = parameters.parent !== undefined ? parameters.parent : document.body;
-        id = parameters.id !== undefined ? parameters.id : 'oldie';
-
-        element = Detector.getWebGLErrorMessage();
-        element.id = id;
-
-        parent.appendChild( element );
-
-    }
-
-};
-
-// browserify support
-if ( typeof module === 'object' ) {
-
-    module.exports = Detector;
-
-}
 
