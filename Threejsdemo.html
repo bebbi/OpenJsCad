@@ -7,7 +7,7 @@
     <script src="Detector.js"></script>
     <script src="three.min.js"></script>
     <script src="csg.js"></script>
-    <script src="OpenJsCADWithThreeJS.js"></script>
+    <script src="openjscad.js"></script>
     <script src="TrackballControls.js"></script>
     <script src="ThreeCSG.js"></script>
 
@@ -32,9 +32,7 @@
     </script>
     <link rel="stylesheet" href="OpenjsCADWithThreeJS.css" type="text/css">
     <style>
-        h1 {
-            text-align: center;
-        }
+
         body {
             font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
             max-width: 820px;
@@ -61,7 +59,10 @@
             outline: none;
         }
 
+        canvas { cursor: move; }
+
     </style>
+    <link rel="stylesheet" href="openjscad.css" type="text/css">
 
 </head>
 <body onload="onload()">

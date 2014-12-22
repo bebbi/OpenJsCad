@@ -76,7 +76,7 @@ THREE.CSG = {
 			// Vertices
 			vertices = [];
 			for ( j = 0; j < polygons[i].vertices.length; j++ ) {
-				vertices.push( this.getGeometryVertice( three_geometry, polygons[i].vertices[j].pos ) );
+				vertices.push( this.getGeometryVertex( three_geometry, polygons[i].vertices[j].pos ) );
 			}
 			if ( vertices[0] === vertices[vertices.length - 1] ) {
 				vertices.pop( );
@@ -94,18 +94,18 @@ THREE.CSG = {
 		return three_geometry;
 	},
 	
-	getGeometryVertice: function ( geometry, vertice_position ) {
+	getGeometryVertex: function ( geometry, vertex_position ) {
 		var i;
 		for ( i = 0; i < geometry.vertices.length; i++ ) {
 
-			if ( geometry.vertices[i].x === vertice_position.x &&
-				geometry.vertices[i].y === vertice_position.y &&
-				geometry.vertices[i].z === vertice_position.z ) {
-				// Vertice already exists
+			if ( geometry.vertices[i].x === vertex_position.x &&
+				geometry.vertices[i].y === vertex_position.y &&
+				geometry.vertices[i].z === vertex_position.z ) {
+				// Vertex already exists
 				return i;
 			}
 		}
-		geometry.vertices.push(new THREE.Vector3( vertice_position.x, vertice_position.y, vertice_position.z ) );
+		geometry.vertices.push(new THREE.Vector3( vertex_position.x, vertex_position.y, vertex_position.z ) );
 		return geometry.vertices.length - 1;
 	}
 };

@@ -16,7 +16,8 @@ THREE.TrackballControls = function ( object, domElement ) {
 
 	this.screen = { width: 0, height: 0, offsetLeft: 0, offsetTop: 0 };
 	this.radius = ( this.screen.width + this.screen.height ) / 4;
-
+	//Initial zoom factor
+	this.factor = 1;
 	this.rotateSpeed = 1.0;
 	this.zoomSpeed = 1.2;
 	this.panSpeed = 0.3;
@@ -436,8 +437,8 @@ THREE.TrackballControls = function ( object, domElement ) {
 
 		}
 
-		_zoomStart.y += delta * 0.01;
 
+		_zoomStart.y += delta * 0.01;
 	}
 
 	function touchstart( event ) {
