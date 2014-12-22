@@ -1,0 +1,2701 @@
+<!DOCTYPE html>
+
+<html><head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <script src="../src/three.min.js"></script>
+  <script src="../src/csg.js"></script>
+  <script src="../src/trackballcontrols.js"></script>
+  <script src="../src/threecsg.js"></script>
+  <script src="../src/openjscad.js"></script>
+  <style>
+
+body {
+  font: 14px/20px 'Helvetica Neue Light', HelveticaNeue-Light, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 10px;
+}
+
+h1 {
+  text-align: center;
+}
+
+pre, code, textarea {
+  font: 12px/20px Monaco, monospace;
+  border: 1px solid #CCC;
+  border-radius: 3px;
+  background: #F9F9F9;
+  padding: 0 3px;
+  color: #555;
+}
+pre, textarea {
+  padding: 10px;
+  width: 100%;
+}
+textarea {
+  height: 200px;
+}
+textarea:focus {
+  outline: none;
+}
+
+canvas { cursor: move; }
+
+    #examples {
+      border:1px solid black;
+      border-radius: 5px;   
+    }
+    
+    #example_info{
+      margin-left: 10px;
+      display: inline-block;
+    }
+    
+    #example_options{
+      margin-left: 30px;
+      display: inline-block ;
+    }
+
+    #render_example {
+      display: inline-block;
+    }
+
+
+  </style>
+<link rel="stylesheet" href="css/openjscad.css" type="text/css">
+
+<script>
+
+var gProcessor=null;
+
+// Show all exceptions to the user:
+OpenJsCad.AlertUserOfUncaughtExceptions();
+
+function onload()
+{
+  gProcessor = new OpenJsCad.Processor(document.getElementById("viewer"));
+  updateSolid("gears_code");
+}
+
+function updateSolid(id)
+{
+  //setting all the text areas to null
+  var gearsTextArea = document.getElementById("gears_code");
+  var couplerTextArea = document.getElementById("coupler_code");
+  var grilleTextArea = document.getElementById("grille_code");
+  var hookTextArea = document.getElementById("hook_code");
+  var lampshadeTextArea = document.getElementById("lampshade_code");
+  var ringTextArea = document.getElementById("ring_code");
+  var servoTextArea = document.getElementById("servo_code");
+  var displayTextArea = document.getElementById(id);
+  couplerTextArea.style.display = 'none';
+  grilleTextArea.style.display = 'none';
+  hookTextArea.style.display = 'none';
+  lampshadeTextArea.style.display = 'none';
+  ringTextArea.style.display = 'none';
+  servoTextArea.style.display = 'none';
+  gearsTextArea.style.display = 'none';
+  //and the current area as visible
+  displayTextArea.style.display = 'block';
+  gProcessor.setJsCad(document.getElementById(id).value);
+  window.scrollTo(0,0);
+}
+
+</script>
+<title>OpenJsCad</title>  
+</head>
+<body onload="onload()">
+  <h1>OpenJsCad</h1>
+Web based solid modeling in Javascript: user editable parametric models, STL and DXF export.
+<div id="viewer"></div><br>
+  <h2>Examples</h2>
+  <div id="examples">
+    <p id="example_info">Please select example to render</p>
+    <select id="example_options">
+      <option value="gears_code"> Gears </option>
+      <option value="coupler_code"> Coupler </option>
+      <option value="grille_code"> Grille </option>
+      <option value="hook_code"> Hook </option>
+      <option value="lampshade_code"> Lampshade </option>
+      <option value="ring_code"> Ring </option>
+      <option value="servo_code"> Servo </option>
+    </select>
+    <input id="render_example" type="submit" value="Update" onclick="updateSolid(document.getElementById('example_options').value); return false;">
+  </div>
+  <h2>Playground</h2>
+Try it by entering some code below. Anything you enter will be lost as soon as this page is reloaded;    
+to build your own models you should instead store them in a .jscad file on your computer 
+and use the <a href="processfile.html"><b>OpenJsCad parser</b></a>.
+<br><br> 
+<textarea id="gears_code">
+function main(params)
+{
+  // Main entry point; here we construct our solid: 
+  var gear = involuteGear(
+    params.numTeeth,
+    params.circularPitch,
+    params.pressureAngle,
+    params.clearance,
+    params.thickness
+  );
+  if(params.centerholeradius &gt; 0)
+  {
+    var centerhole = CSG.cylinder({start: [0,0,-params.thickness], end: [0,0,params.thickness], radius: params.centerholeradius, resolution: 16});
+    gear = gear.subtract(centerhole);
+  }
+  return gear;
+}
+
+// Here we define the user editable parameters: 
+function getParameterDefinitions() {
+  return [
+    { name: 'numTeeth', caption: 'Number of teeth:', type: 'int', default: 15 },
+    { name: 'circularPitch', caption: 'Circular pitch:', type: 'float', default: 10 },
+    { name: 'pressureAngle', caption: 'Pressure angle:', type: 'float', default: 20 },
+    { name: 'clearance', caption: 'Clearance:', type: 'float', default: 0 },
+    { name: 'thickness', caption: 'Thickness:', type: 'float', default: 5 },
+    { name: 'centerholeradius', caption: 'Radius of center hole (0 for no hole):', type: 'float', default: 2 },
+  ];
+}
+
+/*
+  For gear terminology see: 
+    http://www.astronomiainumbria.org/advanced_internet_files/meccanica/easyweb.easynet.co.uk/_chrish/geardata.htm
+  Algorithm based on:
+    http://www.cartertools.com/involute.html
+
+  circularPitch: The distance between adjacent teeth measured at the pitch circle
+*/ 
+function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickness)
+{
+  // default values:
+  if(arguments.length &lt; 3) pressureAngle = 20;
+  if(arguments.length &lt; 4) clearance = 0;
+  if(arguments.length &lt; 4) thickness = 1;
+  
+  var addendum = circularPitch / Math.PI;
+  var dedendum = addendum + clearance;
+  
+  // radiuses of the 4 circles:
+  var pitchRadius = numTeeth * circularPitch / (2 * Math.PI);
+  var baseRadius = pitchRadius * Math.cos(Math.PI * pressureAngle / 180);
+  var outerRadius = pitchRadius + addendum;
+  var rootRadius = pitchRadius - dedendum;
+
+  var maxtanlength = Math.sqrt(outerRadius*outerRadius - baseRadius*baseRadius);
+  var maxangle = maxtanlength / baseRadius;
+
+  var tl_at_pitchcircle = Math.sqrt(pitchRadius*pitchRadius - baseRadius*baseRadius);
+  var angle_at_pitchcircle = tl_at_pitchcircle / baseRadius;
+  var diffangle = angle_at_pitchcircle - Math.atan(angle_at_pitchcircle);
+  var angularToothWidthAtBase = Math.PI / numTeeth + 2*diffangle;
+
+  // build a single 2d tooth in the 'points' array:
+  var resolution = 5;
+  var points = [new CSG.Vector2D(0,0)];
+  for(var i = 0; i &lt;= resolution; i++)
+  {
+    // first side of the tooth:
+    var angle = maxangle * i / resolution;
+    var tanlength = angle * baseRadius;
+    var radvector = CSG.Vector2D.fromAngle(angle);    
+    var tanvector = radvector.normal();
+    var p = radvector.times(baseRadius).plus(tanvector.times(tanlength));
+    points[i+1] = p;
+    
+    // opposite side of the tooth:
+    radvector = CSG.Vector2D.fromAngle(angularToothWidthAtBase - angle);    
+    tanvector = radvector.normal().negated();
+    p = radvector.times(baseRadius).plus(tanvector.times(tanlength));
+    points[2 * resolution + 2 - i] = p;
+  }
+
+  // create the polygon and extrude into 3D:
+  var tooth3d = new CSG.Polygon2D(points).extrude({offset: [0, 0, thickness]});
+
+  var allteeth = new CSG();
+  for(var i = 0; i &lt; numTeeth; i++)
+  {
+    var angle = i*360/numTeeth;
+    var rotatedtooth = tooth3d.rotateZ(angle);
+    allteeth = allteeth.unionForNonIntersecting(rotatedtooth);
+  }
+
+  // build the root circle:  
+  points = [];
+  var toothAngle = 2 * Math.PI / numTeeth;
+  var toothCenterAngle = 0.5 * angularToothWidthAtBase; 
+  for(var i = 0; i &lt; numTeeth; i++)
+  {
+    var angle = toothCenterAngle + i * toothAngle;
+    var p = CSG.Vector2D.fromAngle(angle).times(rootRadius);
+    points.push(p);
+  }
+
+  // create the polygon and extrude into 3D:
+  var rootcircle = new CSG.Polygon2D(points).extrude({offset: [0, 0, thickness]});
+
+  var result = rootcircle.union(allteeth);
+
+  // center at origin:
+  result = result.translate([0, 0, -thickness/2]);
+
+  return result;
+}
+</textarea>
+  <textarea id="coupler_code">
+var cylresolution=16;
+
+// Here we define the user editable parameters:
+function getParameterDefinitions() {
+  return [
+    {
+      name: 'quality',
+      type: 'choice',
+      caption: 'Quality',
+      values: [0, 1],
+      captions: ["Draft","High"],
+      default: 0,
+    },
+
+    { name: 'diameter1', caption: 'Axis diameter of first coupler:', type: 'float', default: 12.2 },
+    { name: 'shaftlength1', caption: 'Axis depth of first coupler:', type: 'float', default: 15 },
+    { name: 'outerlength1', caption: 'Outer length of first coupler:', type: 'float', default: 20 },
+    { name: 'nutradius1', caption: 'Nut radius of first coupler:', type: 'float', default: 4.65 },
+    { name: 'nutthickness1', caption: 'Nut thickness of first coupler:', type: 'float', default: 4.2},
+    { name: 'screwdiameter1', caption: 'Screw diameter of first coupler:', type: 'float', default: 5},
+    { name: 'diameter2', caption: 'Axis diameter of second coupler:', type: 'float', default: 9.5 },
+    { name: 'shaftlength2', caption: 'Axis depth of second coupler:', type: 'float', default: 10 },
+    { name: 'outerlength2', caption: 'Outer length of second coupler:', type: 'float', default: 15 },
+    { name: 'nutradius2', caption: 'Nut radius of second coupler:', type: 'float', default: 3.2 },
+    { name: 'nutthickness2', caption: 'Nut thickness of second coupler:', type: 'float', default: 2.6},
+    { name: 'screwdiameter2', caption: 'Screw diameter of second coupler:', type: 'float', default: 3},
+    { name: 'outerdiameter', caption: 'Outer diameter:', type: 'float', default: 30 },
+    { name: 'spiderlength', caption: 'Spider thickness:', type: 'float', default: 12 },
+    { name: 'spidermargin', caption: 'Spider tolerance:', type: 'float', default: 0 },
+    { name: 'numteeth', caption: 'Num teeth per coupler:', type: 'int', default: 2},
+
+  ];
+}
+
+function main(params)
+{
+  cylresolution=(params.quality == "1")? 64:16;
+
+  var outerdiameter=params.outerdiameter;
+  outerdiameter=Math.max(outerdiameter, params.diameter1+0.5);
+  outerdiameter=Math.max(outerdiameter, params.diameter2+0.5);
+
+  var spidercenterdiameter=outerdiameter/2;
+
+  var part1=makeShaft(params.diameter1, outerdiameter,spidercenterdiameter,params.shaftlength1,params.outerlength1,params.spiderlength, params.nutradius1, params.nutthickness1, params.screwdiameter1, params.numteeth);
+  var part2=makeShaft(params.diameter2, outerdiameter,spidercenterdiameter,params.shaftlength2,params.outerlength2,params.spiderlength, params.nutradius2, params.nutthickness2, params.screwdiameter2, params.numteeth);
+  var spider=makeSpider(outerdiameter, spidercenterdiameter, params.spiderlength, params.numteeth);
+
+  if(params.spidermargin > 0)
+  {
+    spider=spider.contract(params.spidermargin, 4);
+  }
+
+  // rotate shaft parts for better 3d printing:
+  part1=part1.rotateX(180).translate([0,0,params.outerlength1+params.spiderlength]);
+  part2=part2.rotateX(180).translate([0,0,params.outerlength2+params.spiderlength]);
+
+  var result=part1.translate([-outerdiameter-5,0,0]);
+  result=result.union(part2.translate([0,0,0]));
+  result=result.union(spider.translate([outerdiameter+5,0,-params.spidermargin]));
+  return result;
+}
+
+function makeShaft(innerdiameter, outerdiameter, spidercenterdiameter, shaftlength, outerlength, spiderlength, nutradius, nutthickness, screwdiameter, numteeth)
+{
+  var result=CSG.cylinder({start:[0,0,0], end:[0,0,outerlength], radius:outerdiameter/2, resolution:cylresolution});
+
+  for(var i=0; i < numteeth; i++)
+  {
+    var angle=i*360/numteeth;
+    var pie=makePie(outerdiameter/2, spiderlength,angle-45/numteeth, angle+45/numteeth);
+    pie=pie.translate([0,0,outerlength]);
+    result=result.union(pie);
+  }
+  var spidercylinder=CSG.cylinder({start:[0,0,outerlength], end:[0,0,outerlength+spiderlength],radius:spidercenterdiameter/2,resolution:cylresolution});
+  result=result.subtract(spidercylinder);
+  var shaftcylinder=CSG.cylinder({start:[0,0,0], end:[0,0,shaftlength], radius:innerdiameter/2, resolution:cylresolution});
+  result=result.subtract(shaftcylinder);
+
+  var screwz=shaftlength/2;
+  if(screwz < nutradius) screwz=nutradius;
+  var nutcutout = hexagon(nutradius, nutthickness).translate([0,0,-nutthickness/2]);
+  var grubnutradiusAtFlatSide = nutradius * Math.cos(Math.PI / 180 * 30);
+  var nutcutoutrectangle = CSG.cube({
+    radius: [outerlength/2, grubnutradiusAtFlatSide, nutthickness/2],
+    center: [outerlength/2, 0, 0],
+  });
+  nutcutout = nutcutout.union(nutcutoutrectangle);
+  nutcutout = nutcutout.rotateY(90);
+  nutcutout = nutcutout.translate([(outerdiameter+innerdiameter)/4, 0, screwz]);
+  result = result.subtract(nutcutout);
+
+  var screwcutout=CSG.cylinder({
+    start: [outerdiameter/2, 0, screwz],
+    end: [0, 0, screwz],
+    radius: screwdiameter/2,
+    resolution:cylresolution
+  });
+  result=result.subtract(screwcutout);
+
+//return nutcutout;
+//  nutcutout = nutcutout.translate([-grubnutheight/2 - centerholeradius - nutdistance,0,0]);
+
+  return result;
+}
+
+function makePie(radius, height, startangle, endangle)
+{
+  var absangle=Math.abs(startangle-endangle);
+  if(absangle >= 180)
+  {
+    throw new Error("Pie angle must be less than 180 degrees");
+  }
+  var numsteps=cylresolution*absangle/360;
+  if(numsteps < 1) numsteps=1;
+  var points=[];
+  for(var i=0; i <= numsteps; i++)
+  {
+    var angle=startangle+i/numsteps*(endangle-startangle);
+    var vec = CSG.Vector2D.fromAngleDegrees(angle).times(radius);
+    points.push(vec);
+  }
+  points.push(new CSG.Vector2D(0,0));
+  var shape2d=new CSG.Polygon2D(points);
+  var extruded=shape2d.extrude({
+    offset: [0,0,height],   // direction for extrusion
+  });
+  return extruded;
+}
+
+function hexagon(radius, height)
+{
+  var vertices=[];
+  for(var i=0; i < 6; i++)
+  {
+    var point=CSG.Vector2D.fromAngleDegrees(-i*60).times(radius).toVector3D(0);
+    vertices.push(new CSG.Vertex(point));
+  }
+  var polygon=new CSG.Polygon(vertices);
+  var hexagon=polygon.extrude([0,0,height]);
+  return hexagon;
+}
+
+function makeSpider(outerdiameter, spidercenterdiameter, spiderlength, numteeth)
+{
+  var result=new CSG();
+  var numspiderteeth=numteeth*2; // spider has twice the number of teeth
+  for(var i=0; i < numspiderteeth; i++)
+  {
+    var angle=i*360/numspiderteeth;
+    var pie=makePie(outerdiameter/2, spiderlength,angle-90/numspiderteeth, angle+90/numspiderteeth);
+    pie=pie.translate([0,0,0]);
+    result=result.union(pie);
+  }
+
+  var centercylinder=CSG.cylinder({start:[0,0,0], end:[0,0,spiderlength], radius:spidercenterdiameter/2, resolution:cylresolution});
+  result=result.union(centercylinder);
+
+  return result;
+}
+</textarea>
+  <textarea id="grille_code" style="height: 500px">
+// Here we define the user editable parameters:
+function getParameterDefinitions() {
+  return [
+    { name: 'outerwidth', caption: 'Outer width of grille:', type: 'float', default: 190 },
+    { name: 'outerheight', caption: 'Outer height of grille:', type: 'float', default: 120 },
+    { name: 'outerdepth', caption: 'Outer depth of grille:', type: 'float', default: 12 },
+    { name: 'thickness', caption: 'Wall thickness:', type: 'float', default: 2.5 },
+    { name: 'innerdistance', caption: 'Inner standoff distance:', type: 'float', default: 2 },
+    { name: 'bladescale', caption: 'Relative size of blades (1.0 is default):', type: 'float', default: 1 },
+    { name: 'numdividers', caption: 'Number of vertical dividers:', type: 'int', default: 2 },
+    {
+      name: 'addlooseners',
+      type: 'choice',
+      caption: 'Add loops (for easy removal):',
+      values: [0, 1],
+      captions: ["No", "Yes"],
+      default: 1,
+    },
+    {
+      name: 'show',
+      type: 'choice',
+      caption: 'Show:',
+      values: ["all", "grille", "holders"],
+      captions: ["All", "Grille (for printing)", "Holders (for printing)"],
+      default: "all",
+    },
+    {
+      name: 'mouseears',
+      type: 'choice',
+      caption: 'Add mouse ears:',
+      values: [0, 1],
+      captions: ["No", "Yes"],
+      default: 1,
+    },
+    {
+      name: 'quality',
+      type: 'choice',
+      caption: 'Quality:',
+      values: [0, 1],
+      captions: ["Draft", "Final"],
+      default: 0,
+    },
+  ];
+}
+
+function main(params)
+{
+  var outerwidth = params.outerwidth;
+  var outerheight = params.outerheight;
+  var thickness = params.thickness;
+  var outerdepth = params.outerdepth;
+  var innerdistance = params.innerdistance;
+  var bladescale = params.bladescale;
+
+  var draft = params.quality == 0;
+
+  var marginleftright = 21;
+  var margintopbottom = 15;
+  var bladedistance = 12 * bladescale;
+  var frontroundradius = 5;
+  frontroundradius = Math.max(frontroundradius, thickness+0.2);
+  var outerroundradius = 3;
+  outerroundradius = Math.max(outerroundradius, thickness+0.2);
+  outerdepth = Math.max(outerdepth, outerroundradius);
+  outerdepth = Math.max(outerdepth, innerdistance+thickness);
+  var frontextend = innerdistance + bladescale*12 + thickness - outerdepth;
+  frontextend = Math.max(frontextend, 1.5);
+  var bladewidth = outerwidth - 2*marginleftright;
+  var bladesheight = outerheight - 2*margintopbottom;
+  var numblades = Math.ceil(bladesheight / bladedistance) + 1;
+  var topnotchsize = new CSG.Vector3D([20, 8, 3]);
+  var topnotchpos = new CSG.Vector3D([outerwidth/2-thickness - topnotchsize.x/2, outerheight/2-thickness - topnotchsize.y/2, topnotchsize.z/2]);
+  var bottomnotchsize = new CSG.Vector3D([12, 4, topnotchsize.z]);
+  var bottomnotchpos = new CSG.Vector3D([outerwidth/2-thickness - 4 - bottomnotchsize.x/2, -outerheight/2+thickness + bottomnotchsize.y/2, bottomnotchsize.z/2]);
+
+  var roundresolution = draft? 4 : 16;
+
+  var result = new CSG();
+  if(params.show != "holders")
+  {
+    // build the shell:
+    var z0plane = CSG.Plane.fromNormalAndPoint([0, 0, -1], [0, 0, 0]);
+    var outershell = CSG.roundedCube({center: [0,0,0], radius: [outerwidth/2, outerheight/2, outerdepth], roundradius: outerroundradius, resolution: roundresolution});
+    outershell = outershell.cutByPlane(z0plane);
+    var innershell = CSG.roundedCube({center: [0,0,0], radius: [outerwidth/2-thickness, outerheight/2-thickness, outerdepth-thickness], roundradius: outerroundradius-thickness, resolution: roundresolution});
+    innershell = innershell.cutByPlane(z0plane);
+    var shell = outershell.subtract(innershell);
+    var frontextendoutershell = CSG.roundedCube({center: [0,0,0], radius: [bladewidth/2+thickness, bladesheight/2+thickness, outerdepth+frontextend+frontroundradius+thickness], roundradius: frontroundradius, resolution: roundresolution});
+    var frontextendinnershell = CSG.roundedCube({center: [0,0,0], radius: [bladewidth/2, bladesheight/2, outerdepth+frontextend+frontroundradius+thickness+100], roundradius: frontroundradius-thickness, resolution: roundresolution});
+    frontextendinnershell = frontextendinnershell.cutByPlane(z0plane);
+    var plane3 = CSG.Plane.fromNormalAndPoint([0, 0, 1], [0, 0, outerdepth+frontextend+100]);
+    frontextendinnershell = frontextendinnershell.cutByPlane(plane3);
+    var plane1 = CSG.Plane.fromNormalAndPoint([0, 0, 1], [0, 0, outerdepth+frontextend]);
+    frontextendoutershell = frontextendoutershell.cutByPlane(plane1);
+    var plane2 = CSG.Plane.fromNormalAndPoint([0, 0, -1], [0, 0, innerdistance]);
+    frontextendoutershell = frontextendoutershell.cutByPlane(plane2);
+    shell = shell.subtract(frontextendinnershell);
+    var frontextendshell = frontextendoutershell.subtract(frontextendinnershell);
+    shell = shell.union(frontextendshell);
+
+    // build a blade:
+    var curvedpath = CSG.Path2D.arc({
+      center: [0,0,0],
+      radius: 15 * bladescale,
+      startangle: 20,
+      endangle: 80,
+      resolution: draft? 8:32,
+    });
+    var blade = curvedpath.rectangularExtrude(thickness, bladewidth, draft? 4:16, true);
+    var bladecenter = blade.getBounds()[0].plus(blade.getBounds()[1]).times(0.5);
+    blade = blade.translate(bladecenter.negated());
+    blade = blade.rotateY(-90);
+    blade = blade.translate([0, 0, -blade.getBounds()[0].z+innerdistance]);
+    var bladesize = blade.getBounds()[1].minus(blade.getBounds()[0]);
+
+    // add the blades to the shell:
+    var blades = new CSG();
+    for(var i = 0; i < numblades; i++)
+    {
+      var topy = bladesheight/2 + thickness - i*bladedistance;
+      var translatedblade = blade.translate([0, topy-bladesize.y/2, 0]);
+      blades = blades.union(translatedblade);
+    }
+    blades = blades.intersect(frontextendinnershell);
+    var grille = shell;
+    grille = shell.union(blades);
+
+    // add the dividers:
+    var dividers = new CSG();
+    if(params.numdividers > 0)
+    {
+      var w1 = (bladewidth - params.numdividers * thickness)/(params.numdividers+1);
+      for(var i = 0; i < params.numdividers; i++)
+      {
+        var x = -(params.numdividers-1)*(w1+thickness)/2 + i*(w1+thickness);
+        var z1 = outerdepth+frontextend;
+        var divider = CSG.cube({center: [x, 0, (z1+innerdistance)/2], radius: [thickness/2, bladesheight/2, (z1-innerdistance)/2]});
+        dividers = dividers.union(divider);
+      }
+    }
+    grille = grille.union(dividers);
+
+    // create the notches:
+    var notches = new CSG();
+    var topnotch1 = CSG.cube({center: topnotchpos, radius: topnotchsize.times(0.5) });
+    notches = notches.union(topnotch1);
+    var topnotch2 = CSG.cube({center: [-topnotchpos.x, topnotchpos.y, topnotchpos.z], radius: topnotchsize.times(0.5) });
+    notches = notches.union(topnotch2);
+    var bottomnotch1 = CSG.cube({center: bottomnotchpos, radius: bottomnotchsize.times(0.5) });
+    notches = notches.union(bottomnotch1);
+    var bottomnotch2 = CSG.cube({center: [-bottomnotchpos.x, bottomnotchpos.y, bottomnotchpos.z], radius: bottomnotchsize.times(0.5) });
+    notches = notches.union(bottomnotch2);
+    notches = notches.intersect(outershell);
+    grille = grille.union(notches);
+    result = result.union(grille);
+
+    // create the looseners:
+    if(params.addlooseners != 0)
+    {
+      var loosenerinnerwidth = 5;
+      var loosenerinnerheight = 2;
+      var loosenerdepth = 4;
+      var loosener = CSG.cube({center: [0, -outerheight/2 - loosenerinnerheight/2, loosenerdepth/2],
+        radius: [loosenerinnerwidth/2+thickness, loosenerinnerheight/2+thickness, loosenerdepth/2]});
+      loosener = loosener.subtract(CSG.cube({center: [0, -outerheight/2 - loosenerinnerheight/2, loosenerdepth/2],
+        radius: [loosenerinnerwidth/2, loosenerinnerheight/2, loosenerdepth/2]}));
+      var loosenerx = -outerwidth/2 + loosenerinnerwidth/2 + 5 + thickness;
+
+      var looseners = loosener.translate([loosenerx, 0, 0]);
+      looseners = looseners.union(loosener.translate([-loosenerx, 0, 0]));
+      result = result.union(looseners);
+    }
+
+    if(params.mouseears != 0)
+    {
+      for(var i = 0; i < 4; i++)
+      {
+        var xpos=outerwidth/2-10;
+        var ypos=outerheight/2;
+        if(i&1) xpos = -xpos;
+        if(i&2) ypos = -ypos;
+        var cylinder = CSG.cylinder({start: [xpos, ypos, 0], end: [xpos, ypos, 0.5], radius: 15});
+        result = result.union(cylinder);
+      }
+      for(var i = 0; i < 4; i++)
+      {
+        var xpos=bladewidth/2 + thickness/2;
+        var ypos=bladesheight/2 + thickness/2;
+        if(i&1) xpos = -xpos;
+        if(i&2) ypos = -ypos;
+        var cyl1 = CSG.cylinder({start: [xpos, ypos, 0], end: [xpos, ypos, 0.5], radius: 15});
+        var cyl2 = CSG.cylinder({start: [xpos, ypos, 0], end: [xpos, ypos, innerdistance], radius: 5});
+        result = result.union(cyl1.union(cyl2));
+      }
+    }
+  }
+
+  if(params.show != "grille")
+  {
+    // create the holders:
+    var holderyoffset = 0.5;
+    var holderzoffset = 1;
+    var holderwidth = 10;
+    var holderthickness = 3;
+    var holdertopclipheight = 4;
+    var holderbottomclipheight = 2;
+    var holderscrewholeradius = 2;
+    var holderscrewholedistance = 6;
+
+    var holderx;
+    if(params.show == "holders")
+    {
+      // just the holders:
+      holderx = holderwidth/2+2;
+    }
+    else
+    {
+      holderx = bottomnotchpos.x + bottomnotchsize.x/2 - holderwidth/2;
+    }
+    var holdery1 = topnotchpos.y - topnotchsize.y/2 - holderyoffset;
+    var holdery2 = bottomnotchpos.y + bottomnotchsize.y/2 + holderyoffset;
+
+    var holdery0 = holdery1+holdertopclipheight;
+    var holdery3 = holdery2-holderbottomclipheight;
+    var holder = CSG.cube({center: [0, (holdery1 + holdery2)/2 , holderthickness/2],
+      radius: [holderwidth/2, (holdery1-holdery2)/2, holderthickness/2]});
+    var d1 = 7;
+    var holdery1a = holdery1 - d1;
+    var holdery2a = holdery2 + d1;
+    var holderz1 = topnotchsize.z + holderzoffset;
+    var holderz2 = holderz1 + holderthickness;
+    holder = holder.union(CSG.cube({
+      center: [0, (holdery1a+holdery1)/2, holderz2/2],
+      radius: [holderwidth/2, (holdery1-holdery1a)/2, holderz2/2]
+    }));
+    holder = holder.union(CSG.cube({
+      center: [0, (holdery2a+holdery2)/2, holderz2/2],
+      radius: [holderwidth/2, (holdery2a-holdery2)/2, holderz2/2]
+    }));
+    holder = holder.union(CSG.cube({
+      center: [0, (holdery0+holdery1a)/2, (holderz2+holderz1)/2],
+      radius: [holderwidth/2, (holdery0-holdery1a)/2, (holderz2-holderz1)/2]
+    }));
+    holder = holder.union(CSG.cube({
+      center: [0, (holdery2a+holdery3)/2, (holderz2+holderz1)/2],
+      radius: [holderwidth/2, (holdery2a-holdery3)/2, (holderz2-holderz1)/2]
+    }));
+    var screwhole = CSG.cylinder({start: [0,0,0], end: [0, 0, holderthickness], radius: holderscrewholeradius, resolution: 16});
+    holder = holder.subtract(screwhole.translate([0, holdery1a-holderscrewholedistance, 0]));
+    holder = holder.subtract(screwhole.translate([0, holdery2a+holderscrewholedistance, 0]));
+
+    holder = holder.setColor(0, 1, 0);
+
+    var holders = holder.translate([holderx,0,0]);
+    holders = holders.union(holder.translate([-holderx,0,0]));
+    if(params.show == "holders")
+    {
+      holders = holders.rotateZ(90);
+    }
+
+    result = result.union(holders);
+  }
+  result = result.rotateZ(90);
+  return result;
+}
+</textarea>
+  <textarea id="hook_code">
+// Here we define the user editable parameters:
+function getParameterDefinitions() {
+  return [
+    { name: 'topdiameter', caption: 'Inner diameter of top hook:', type: 'float', default: 16.7 },
+    { name: 'clampfactor', caption: 'Snugness of top hook (0 - 100):', type: 'float', default: 25 },
+    { name: 'cliplength', caption: 'Top hook clip length:', type: 'float', default: 5 },
+    { name: 'bottomdiameter', caption: 'Inner diameter of bottom hook:', type: 'float', default: 20 },
+    { name: 'height', caption: 'Outer height of the hook:', type: 'float', default: 60 },
+    { name: 'thickness', caption: 'Thickness:', type: 'float', default: 5 },
+    { name: 'width', caption: 'Width:', type: 'float', default: 7 },
+    {
+      name: 'rounded',
+      type: 'choice',
+      caption: 'Rounded edges',
+      values: [0, 1],
+      captions: ["No", "Yes (rendering will take a long time!)"],
+      default: 0,
+    },
+    { name: 'roundness', caption: 'Diameter of rounded edges (if enabled):', type: 'float', default: 1.5 },
+    { name: 'buildwidth', caption: 'Width (x) of build area (to print multiple copies):', type: 'float', default: 90 },
+    { name: 'builddepth', caption: 'Depth (y) of build area (to print multiple copies):', type: 'float', default: 90 },
+  ];
+}
+
+function main(params) {
+  if(OpenJsCad.log) OpenJsCad.log("start");
+
+  var pathresolution = 16;
+  var expandresolution = 6;
+
+  // construct the 2D path:
+  var topradius = params.topdiameter/2;
+  var bottomradius = params.bottomdiameter/2;
+  var halfthickness = params.thickness/2;
+  topradius += halfthickness;
+  bottomradius += halfthickness;
+
+  var roundness = params.roundness;
+  if(params.rounded == 0)
+  {
+    roundness = 0;
+  }
+  roundness = Math.min(roundness, halfthickness-0.1, params.width/2-0.1);
+  if(roundness < 0) roundness = 0;
+
+  var clampfactor = params.clampfactor / 100;
+  if(clampfactor < 0) clampfactor = 0;
+  if(clampfactor >= 1) clampfactor = 1;
+  clampfactor *= (topradius-halfthickness)/topradius;
+
+  var topstartangle = - 180 * Math.acos(1 - 2*clampfactor) / Math.PI;
+  var tophookcenter = new CSG.Vector2D(topradius, 0);
+  var tophookstart = tophookcenter.plus(CSG.Vector2D.fromAngleDegrees(topstartangle).times(topradius));
+  var circledistance = params.height - topradius - bottomradius - 2 * params.thickness;
+  if(circledistance < 0) circledistance = 0;
+  var bottomhookcenter = new CSG.Vector2D(-bottomradius, -circledistance);
+  var gravityangle = 90 - tophookcenter.minus(bottomhookcenter).angleDegrees();
+
+  var path = new CSG.Path2D();
+
+  // top hook curve:
+  if(params.cliplength > 0)
+  {
+    var clipstart = new CSG.Vector2D([0, -1]).times(params.cliplength).plus(tophookstart);
+    path = path.appendPoint(clipstart);
+  }
+  var topcurvepath = CSG.Path2D.arc({
+    center: tophookcenter,
+    radius: topradius,
+    startangle: topstartangle,
+    endangle: 180,
+    resolution: pathresolution,
+    maketangent: true,
+  });
+  path = path.concat(topcurvepath);
+
+  // straight middle part:
+  if(circledistance > 0)
+  {
+    path = path.appendPoint([0, -circledistance]);
+  }
+
+  // bottom hook curve:
+  var bottomcurvepath = CSG.Path2D.arc({
+    center: bottomhookcenter,
+    radius: bottomradius,
+    startangle: 0,
+    endangle: -180-gravityangle,
+    resolution: pathresolution,
+    maketangent: true,
+  });
+  path = path.concat(bottomcurvepath);
+
+  // center around origin, and rotate as it would hang under gravity:
+  var centerpoint = tophookcenter.plus(bottomhookcenter).times(0.5);
+  var matrix = CSG.Matrix4x4.translation(centerpoint.negated().toVector3D(0));
+  matrix = matrix.multiply(CSG.Matrix4x4.rotationZ(gravityangle));
+  path = path.transform(matrix);
+
+  // extrude the path to create a 3D solid
+  var hook = path.rectangularExtrude(2*(halfthickness-roundness), params.width-2*roundness, pathresolution, true);
+  hook = hook.translate([0, 0, -params.width/2+roundness]);
+
+  // expand to create rounded corners:
+  if(roundness > 0)
+  {
+    hook = hook.expand(roundness, expandresolution);
+  }
+  // hook = hook.toPointCloud(0.1);
+
+  // determine how many objects will fit in the build area:
+  var bounds = hook.getBounds();
+  var objsize = bounds[1].minus(bounds[0]);
+  var margin = 5; // distance between the copies
+  var numx = Math.floor((params.buildwidth + margin) / (objsize.x + margin));
+  var numy = Math.floor((params.builddepth + margin) / (objsize.y + margin));
+  if(numx < 1) numx = 1;
+  if(numy < 1) numy = 1;
+
+  // and make the copies:
+  var result = new CSG();
+  for(var x = 0; x < numx; x++)
+  {
+    var deltax = ((1-numx)/2+x) * (objsize.x + margin);
+    var colresult = new CSG();
+    for(var y = 0; y < numy; y++)
+    {
+      var deltay = ((1-numy)/2+y) * (objsize.y + margin);
+      var translated = hook.translate(new CSG.Vector3D(deltax, deltay, 0));
+      colresult = colresult.union(translated);
+    }
+    result = result.union(colresult);
+  }
+
+  if(OpenJsCad.log) OpenJsCad.log("finish");
+  return result;
+}
+</textarea>
+  <textarea id="lampshade_code" style="height: 500px">
+function main(params)
+{
+  CSG.defaultResolution2D = (params.quality == "DRAFT")? 8:32;
+
+  var bottomradius = params.bottomdiameter/2;
+  var topradius = params.topdiameter/2;
+  var height = params.height;
+  var numfaces = params.numfaces;
+  var thickness = params.thickness;
+  var topholeradius = params.topholediameter/2;
+  var cutterRadius = params.cutterdiameter / 2;
+
+  var solid = CSG.cube({radius: [1000, 1000, height/2]});
+
+  var plane = CSG.Plane.fromPoints([bottomradius, 0, -height/2], [bottomradius, 10, -height/2], [topradius, 0, height/2]);
+  for(var i = 0; i < numfaces; i++)
+  {
+    solid = solid.cutByPlane(plane.rotateZ(i * 360 / numfaces));
+  }
+
+  var plates = solidToOuterShellPlates(solid, thickness);
+  plates = removePlateWithNormal(plates, [0,0,-1]);
+  plates = removePlateWithNormal(plates, [0,0,1]);
+
+  for(var i = 1; i < numfaces; i++)
+  {
+    plates[i] = plates[0].rotateZ(i * 360 / numfaces);
+  }
+
+  var topplate = getStockPlate(1000,1000,thickness)
+    .subtract(CSG.cylinder({start: [0,0,-thickness], end:[ 0,0,thickness], radius: topholeradius}))
+    .translate([0,0,height/2-thickness/2-10]);
+  topplate = topplate.intersect(solid);
+  topplate = fixPlate(topplate, thickness);
+
+  var fingerjointoptions = {
+    margin: 0, cutterRadius: cutterRadius, fingerWidth: 25
+  };
+  plates = fingerJoint(plates,fingerjointoptions);
+  plates = fingerJointAdd(plates, topplate, fingerjointoptions);
+
+  if(params.type == "TOPPLATE")
+  {
+    return plateCSGToCAG(plates[numfaces]);
+  }
+  else
+  {
+    var plate2d = plateCSGToCAG(plates[0]);
+    plate2d = addRandomHoles(plate2d);
+    if(params.type == "SIDEPLATE")
+    {
+      return plate2d;
+    }
+    else
+    {
+      for(var i = 0; i < numfaces; i++)
+      {
+        var plate3d =  plateCAGToCSG(plate2d, plates[i].properties.platebasis, thickness);
+        plates[i] = plate3d;
+      }
+      var result = new CSG().union(plates);
+      result = result.rotateX(90);
+      return result;
+    }
+  }
+}
+
+function addRandomHoles(plate)
+{
+  var distancefromedge = 8;
+  var distancebetweenholes = 10;
+  var mindiameter = 10;
+  var maxdiameter = 25;
+  // maskarea: the 'forbidden' area for holes:
+  var maskarea = plate.contract(distancefromedge, 4);
+  var bounds = maskarea.getBounds();
+  var maskarea = maskarea.flipped();
+  var holes = [];
+  var existingholecenters = [];
+  var existingholeradii = [];
+  for(var i = 0; i < 10; i++)
+  {
+    for(var tryindex = 0; tryindex < 10; tryindex++)
+    {
+      var holeradius = (mindiameter + Math.random() * (maxdiameter - mindiameter))/2;
+      var x = bounds[0].x + holeradius + (bounds[1].x - bounds[0].x - holeradius*2) * Math.random();
+      var y = bounds[0].y + holeradius + (bounds[1].y - bounds[0].y - holeradius*2) * Math.random();
+      var holecenter = new CSG.Vector2D(x,y);
+      var valid = true;
+      // check if the hole is too close to one of the existing holes:
+      var numexistingholes = existingholecenters.length;
+      for(var i2 = 0; i2 < numexistingholes; i2++)
+      {
+        var d = holecenter.minus(existingholecenters[i2]).length();
+        if(d < holeradius+existingholeradii[i2] + distancebetweenholes)
+        {
+          valid = false;
+          break;
+        }
+      }
+      if(valid)
+      {
+        // check if the hole is not too close to the edges:
+        var hole = CAG.circle({radius: holeradius, center: holecenter});
+        var testarea = maskarea.intersect(hole);
+        if(testarea.sides.length != 0) valid = false;
+      }
+      if(valid)
+      {
+        existingholeradii.push(holeradius);
+        existingholecenters.push(holecenter);
+        holes.push(hole);
+        break;
+      }
+    }
+  }
+  return plate.subtract(holes);
+}
+
+function plateCSGToCAG(plate)
+{
+  if(!("platebasis" in plate.properties))
+  {
+    throw new Error("Plates should be created using getStockPlate()");
+  }
+  var plate2d = plate.projectToOrthoNormalBasis(plate.properties.platebasis);
+  return plate2d;
+}
+
+function plateCAGToCSG(plate2d, platebasis, thickness)
+{
+  var basisinversematrix = platebasis.getInverseProjectionMatrix();
+  var plate_reprojected = plate2d.extrude({offset: [0,0,thickness]}).translate([0,0,-thickness/2]);
+  plate_reprojected = plate_reprojected.transform(basisinversematrix);
+  plate_reprojected.properties.platebasis = platebasis;
+  return plate_reprojected;
+}
+
+function fixPlate(plate, thickness)
+{
+  return plateCAGToCSG(plateCSGToCAG(plate), plate.properties.platebasis, thickness);
+}
+
+function removePlateWithNormal(plates, normalvector)
+{
+  normalvector = new CSG.Vector3D(normalvector);
+  var result = [];
+  plates.map(function(plate){
+    if(!("platebasis" in plate.properties))
+    {
+      throw new Error("Plates should be created using getStockPlate()");
+    }
+    if(plate.properties.platebasis.plane.normal.dot(normalvector) < 0.9999)
+    {
+      result.push(plate);
+    }
+  });
+  return result;
+}
+
+function getStockPlate(width, height, thickness)
+{
+  var result = CSG.cube({radius: [width/2, height/2, thickness/2]});
+  result.properties.platebasis = CSG.OrthoNormalBasis.Z0Plane();
+  return result;
+}
+
+function fingerJointAdd(plates, newplate, options)
+{
+  var result = plates.slice(0);
+  var numplates = plates.length;
+  for(var plateindex1 = 0; plateindex1 < numplates; plateindex1++)
+  {
+    var joined = fingerJointTwo(result[plateindex1], newplate, options);
+    result[plateindex1] = joined[0];
+    newplate = joined[1];
+  }
+  result.push(newplate);
+  return result;
+}
+
+// Finger joint between multiple plates:
+function fingerJoint(plates, options)
+{
+  var result = plates.slice(0);
+  var numplates = plates.length;
+  var maxdelta = Math.floor(numplates/2);
+  for(var delta=1; delta <= maxdelta; delta++)
+  {
+    for(var plateindex1 = 0; plateindex1 < numplates; plateindex1++)
+    {
+      var plateindex2 = plateindex1 + delta;
+      if(plateindex2 >= numplates) plateindex2 -= numplates;
+
+      var joined = fingerJointTwo(result[plateindex1], result[plateindex2], options);
+      result[plateindex1] = joined[0];
+      result[plateindex2] = joined[1];
+      if(delta*2 >= numplates)
+      {
+        // numplates is even
+        if(plateindex1*2 >= numplates)
+        {
+          // and we've done the first half: we're done
+          break;
+        }
+      }
+    }
+  }
+  return result;
+}
+
+function fingerJointTwo(plate1, plate2, options)
+{
+  if(!options) options = {};
+  if(!("platebasis" in plate1.properties))
+  {
+    throw new Error("Plates should be created using getStockPlate()");
+  }
+  if(!("platebasis" in plate2.properties))
+  {
+    throw new Error("Plates should be created using getStockPlate()");
+  }
+  // get the intersection solid of the 2 plates:
+  var intersection = plate1.intersect(plate2);
+  if(intersection.polygons.length == 0)
+  {
+    // plates do not intersect. Return unmodified:
+    return [plate1, plate2];
+  }
+  else
+  {
+    var plane1 = plate1.properties.platebasis.plane;
+    var plane2 = plate2.properties.platebasis.plane;
+    // get the intersection line of the 2 center planes:
+    var jointline = plane1.intersectWithPlane(plane2);
+    // Now we need to find the two endpoints on jointline (the points at the edges of intersection):
+    // construct a plane perpendicular to jointline:
+    var plane1 = CSG.Plane.fromNormalAndPoint(jointline.direction, jointline.point);
+    // make the plane into an orthonormal basis:
+    var basis1 = new CSG.OrthoNormalBasis(plane1);
+    // get the projection matrix for the orthobasis:
+    var matrix = basis1.getProjectionMatrix();
+    // now transform the intersection solid:
+    var intersection_transformed = intersection.transform(matrix);
+    var bounds = intersection_transformed.getBounds();
+    // now we know the two edge points. The joint line runs from jointline_origin, in the
+    // direction jointline_direction and has a length jointline_length (jointline_length >= 0)
+    var jointline_origin = jointline.point.plus(jointline.direction.times(bounds[0].z));
+    var jointline_direction = jointline.direction;
+    var jointline_length = bounds[1].z - bounds[0].z;
+
+    var fingerwidth = options.fingerWidth || (jointline_length / 4);
+    var numfingers=Math.round(jointline_length / fingerwidth);
+    if(numfingers < 2) numfingers=2;
+    fingerwidth = jointline_length / numfingers;
+
+    var margin = options.margin || 0;
+    var cutterRadius = options.cutterRadius || 0;
+    var results = [];
+    for(var plateindex = 0; plateindex < 2; plateindex++)
+    {
+      var thisplate = (plateindex == 1)? plate2:plate1;
+      // var otherplate = (plateindex == 1)? plate1:plate2;
+      // create a new orthonormal basis for this plate, such that the joint line runs in the positive x direction:
+      var platebasis = new CSG.OrthoNormalBasis(thisplate.properties.platebasis.plane, jointline_direction);
+      // get the 2d shape of our plate:
+      var plate2d = thisplate.projectToOrthoNormalBasis(platebasis);
+      var jointline_origin_2d = platebasis.to2D(jointline_origin);
+      matrix = platebasis.getProjectionMatrix();
+      intersection_transformed = intersection.transform(matrix);
+      bounds = intersection_transformed.getBounds();
+      var maxz = bounds[1].z;
+      var minz = bounds[0].z;
+      var maxy = bounds[1].y + margin/2;
+      var miny = bounds[0].y - margin/2;
+
+      var cutouts2d = [];
+      for(var fingerindex = 0; fingerindex < numfingers; fingerindex++)
+      {
+        if( (plateindex == 0) && ((fingerindex & 1)==0) ) continue;
+        if( (plateindex == 1) && ((fingerindex & 1)!=0) ) continue;
+        var minx = jointline_origin_2d.x + fingerindex * fingerwidth - margin/2;
+        var maxx = minx + fingerwidth + margin;
+        var cutout = createRectCutoutWithCutterRadius(minx, miny, maxx, maxy, cutterRadius, plate2d);
+        cutouts2d.push(cutout);
+      }
+      var cutout2d = new CAG().union(cutouts2d);
+      var cutout3d = cutout2d.extrude({offset: [0,0,maxz-minz]}).translate([0,0,minz]);
+      cutout3d = cutout3d.transform(platebasis.getInverseProjectionMatrix());
+      var thisplate_modified = thisplate.subtract(cutout3d);
+      results[plateindex] = thisplate_modified;
+    }
+    return results;
+  }
+}
+
+// Create a rectangular cutout in 2D
+// minx, miny, maxx, maxy: boundaries of the rectangle
+// cutterRadius: if > 0, add extra cutting margin at the corners of the rectangle
+// plate2d is the 2d shape from which the cutout will be subtracted
+// it is tested at the corners of the cutout rectangle, to see if do need to add the extra margin at that corner
+function createRectCutoutWithCutterRadius(minx, miny, maxx, maxy, cutterRadius, plate2d)
+{
+  var deltax = maxx-minx;
+  var deltay = maxy-miny;
+  var cutout = CAG.rectangle({radius: [(maxx-minx)/2, (maxy-miny)/2], center: [(maxx+minx)/2, (maxy+miny)/2]});
+  var cornercutouts = [];
+  if(cutterRadius > 0)
+  {
+    var extracutout = cutterRadius * 0.2;
+    var hypcutterradius = cutterRadius / Math.sqrt(2.0);
+    var halfcutterradius = 0.5 * cutterRadius;
+    var dcx, dcy;
+    if(deltax > 3*deltay)
+    {
+      dcx = cutterRadius + extracutout/2;
+      dcy = extracutout / 2;
+    }
+    else if(deltay > 3*deltax)
+    {
+      dcx = extracutout / 2;
+      dcy = cutterRadius + extracutout/2;
+    }
+    else
+    {
+      dcx = hypcutterradius-extracutout/2;
+      dcy = hypcutterradius-extracutout/2;
+    }
+    for(var corner = 0; corner < 4; corner++)
+    {
+      var cutoutcenterx = (corner & 2)? (maxx-dcx):(minx+dcx);
+      var cutoutcentery = (corner & 1)? (maxy-dcy):(miny+dcy);
+      var cornercutout = CAG.rectangle({radius: [cutterRadius+extracutout/2, cutterRadius+extracutout/2], center: [cutoutcenterx, cutoutcentery]});
+      var testrectacenterx = (corner & 2)? (maxx-halfcutterradius):(minx+halfcutterradius);
+      var testrectbcenterx = (corner & 2)? (maxx+halfcutterradius):(minx-halfcutterradius);
+      var testrectacentery = (corner & 1)? (maxy+halfcutterradius):(miny-halfcutterradius);
+      var testrectbcentery = (corner & 1)? (maxy-halfcutterradius):(miny+halfcutterradius);
+      var testrecta = CAG.rectangle({radius: [halfcutterradius, halfcutterradius], center: [testrectacenterx, testrectacentery]});
+      var testrectb = CAG.rectangle({radius: [halfcutterradius, halfcutterradius], center: [testrectbcenterx, testrectbcentery]});
+      if( (plate2d.intersect(testrecta).sides.length > 0)
+       && (plate2d.intersect(testrectb).sides.length > 0) )
+      {
+        cornercutouts.push(cornercutout);
+      }
+    }
+  }
+  if(cornercutouts.length > 0)
+  {
+    cutout = cutout.union(cornercutouts);
+  }
+  return cutout;
+}
+
+function solidToOuterShellPlates(csg, thickness)
+{
+  csg = csg.canonicalized();
+  var bounds = csg.getBounds();
+  var csgcenter = bounds[1].plus(bounds[0]).times(0.5);
+  var csgradius = bounds[1].minus(bounds[0]).length();
+  var plane2polygons = {};
+  csg.polygons.map(function(polygon){
+    var planetag = polygon.plane.getTag();
+    if(!(planetag in plane2polygons))
+    {
+      plane2polygons[planetag] = [];
+    }
+    plane2polygons[planetag].push(polygon);
+  });
+  var plates = [];
+  for(var planetag in plane2polygons)
+  {
+    var polygons = plane2polygons[planetag];
+    var plane = polygons[0].plane;
+    var shellcenterplane = new CSG.Plane(plane.normal, plane.w - thickness/2);
+    var basis = new CSG.OrthoNormalBasis(shellcenterplane);
+    var inversebasisprojection = basis.getInverseProjectionMatrix();
+    var csgcenter_projected = basis.to2D(csgcenter);
+    var plate = getStockPlate(csgradius, csgradius, thickness).translate([csgcenter_projected.x, csgcenter_projected.y, 0]);
+    plate = plate.transform(inversebasisprojection);
+    plate = plate.intersect(csg);
+    plates.push(plate);
+  }
+  return plates;
+}
+
+function getParameterDefinitions()
+{
+  return [
+    {name: 'topdiameter', type: 'float', default: 160, caption: "Top diameter:"},
+    {name: 'bottomdiameter', type: 'float', default: 300, caption: "Bottom diameter:"},
+    {name: 'height', type: 'float', default: 170, caption: "Height:"},
+    {name: 'numfaces', type: 'int', default: 5, caption: "Number of faces:"},
+    {name: 'thickness', type: 'float', default: 4, caption: "Thickness of stock material:"},
+    {name: 'topholediameter', type: 'float', default: 42, caption: "Diameter of top hole:"},
+    {name: 'cutterdiameter', type: 'float', default: 3.2, caption: "Diameter of CNC cutter / laser beam:"},
+
+    {
+      name: 'type',
+      type: 'choice',
+      values: ["ASSEMBLED", "TOPPLATE", "SIDEPLATE"],               // these are the values that will be supplied to your script
+      captions: ["Assembled", "Top plate (DXF output)", "Side plate (DXF output)"],  // optional, these values are shown in the listbox
+                                                   // if omitted, the items in the 'values' array are used
+      caption: 'Show:',                           // optional, displayed left of the input field
+      default: "ASSEMBLED",                              // optional, default selected value
+                                                   // if omitted, the first item is selected by default
+    },
+    {
+      name: 'quality',
+      type: 'choice',
+      values: ["DRAFT", "HIGH"],               // these are the values that will be supplied to your script
+      captions: ["Draft", "High"],  // optional, these values are shown in the listbox
+                                                   // if omitted, the items in the 'values' array are used
+      caption: 'Quality:',                           // optional, displayed left of the input field
+      default: "DRAFT",                              // optional, default selected value
+                                                   // if omitted, the first item is selected by default
+    },
+
+
+
+  ];
+}
+</textarea>
+  <textarea id="ring_code">
+
+// -*- mode: javascript; -*-
+
+
+'use strict';
+
+function getParameterDefinitions() {
+  return [
+    {
+      name: 'hisorhers',
+      type: 'choice',
+      caption: 'For Daniel or Zette:',
+      values: [0, 1],
+      captions: ["Dan", "Suzette"],
+      default: 0,
+    },
+   ];
+}
+
+
+var his = true;
+
+
+var debugcount = 10;
+function debugprint () {
+    if (debugcount-- > 0) {
+	try {
+	    console.log(arguments);
+	} catch (err) {
+	    //
+	}
+    }
+}
+
+
+// interpolate between v2 and v3, at time u
+function catmullRom(v1, v2, v3, v4, u) {
+    var c1x,c2x,c3x,c4x, resX;
+    var c1y,c2y,c3y,c4y, resY;
+    var c1z,c2z,c3z,c4z, resZ;
+
+    // Coefficients for Matrix M
+    // these should all be const, but MSIE doens't handle that
+    var M11	= 0.0;
+    var M12	= 1.0;
+    var M13	= 0.0;
+    var M14	= 0.0;
+    var M21	=-0.5;
+    var M22	= 0.0;
+    var M23	= 0.5;
+    var M24	= 0.0;
+    var M31	= 1.0;
+    var M32	=-2.5;
+    var M33	= 2.0;
+    var M34	=-0.5;
+    var M41	=-0.5;
+    var M42	= 1.5;
+    var M43	=-1.5;
+    var M44	= 0.5;
+
+    c1x =  	         M12*v2.x;
+    c2x = M21*v1.x            + M23*v3.x;
+    c3x = M31*v1.x + M32*v2.x + M33*v3.x + M34*v4.x;
+    c4x = M41*v1.x + M42*v2.x + M43*v3.x + M44*v4.x;
+
+    c1y =  	         M12*v2.y;
+    c2y = M21*v1.y            + M23*v3.y;
+    c3y = M31*v1.y + M32*v2.y + M33*v3.y + M34*v4.y;
+    c4y = M41*v1.y + M42*v2.y + M43*v3.y + M44*v4.y;
+
+    c1z =  	         M12*v2.z;
+    c2z = M21*v1.z            + M23*v3.z;
+    c3z = M31*v1.z + M32*v2.z + M33*v3.z + M34*v4.z;
+    c4z = M41*v1.z + M42*v2.z + M43*v3.z + M44*v4.z;
+
+    resX = (((c4x*u + c3x)*u +c2x)*u + c1x);
+    resY = (((c4y*u + c3y)*u +c2y)*u + c1y);
+    resZ = (((c4z*u + c3z)*u +c2z)*u + c1z);
+
+    return new CSG.Vector3D(resX, resY, resZ);
+}
+
+var tiny = 0.0000001;
+
+function catmullRomWithTangent(v1, v2, v3, v4, u) {
+    if ((u+tiny) <= 1) {
+	var res1 = catmullRom(v1, v2, v3, v4, u) ;
+	var res2 = catmullRom(v1, v2, v3, v4, u+tiny) ;
+	var tangent = res2.minus(res1).unit();
+	return [res1, tangent];
+    } else {
+	var res1 = catmullRom(v1, v2, v3, v4, u-tiny) ;
+	var res2 = catmullRom(v1, v2, v3, v4, u) ;
+	var tangent = res2.minus(res1).unit();
+	return [res2, tangent];
+    }
+}
+
+
+
+// create a CSG by dragging a CAG along a Catmull-Rom spline
+// where the 'top' of the CAG is 'up' and 'sideways' of
+// the CAG are perpendicular to 'up' and the spline tangent
+
+
+function splineExtrude(vCP, numInterps, up,
+		       cag, transform) {
+    var polygons = [];
+    var splinePointsAndTangents = [];
+    // corners is an array of arrays
+
+    // corners [j] corresponds to the array of all points on the
+    // spline with the offset of cag.sides[j].vertex0
+
+    // corners[j][i] is the i'th interpolated point on the master
+    // spline, plus the offset of cag.sides[j].vertex0
+
+    var corners = [];
+    var nSides = cag.sides.length;
+
+    for (i=0; i< nSides; i++) {
+	corners.push([]);
+    }
+
+    if (typeof(transform) != 'function') {
+	transform = function(e) { return e; };
+    }
+
+    // fencepost - do the zeroth point of the zeroth segment
+    splinePointsAndTangents.push(catmullRomWithTangent(vCP[0],vCP[0+1],
+						       vCP[0+2],vCP[0+3],0));
+    for (var j = 0; j <= vCP.length-4; j++) {
+	// don't do the zeroth point, because it's the same as the
+	// last point of the previous segment
+	for (var i = 1; i <= numInterps; i++) {
+	    var u = i/numInterps;
+	    splinePointsAndTangents.push(catmullRomWithTangent(vCP[j],vCP[j+1],
+							       vCP[j+2],vCP[j+3],u));
+	}
+    }
+
+
+    for (var i=0; i < splinePointsAndTangents.length; i++) {
+	var sideways = up.cross(splinePointsAndTangents[i][1]);
+	for (var j = 0; j < nSides; j++) {
+	    corners[j].push(transform(splinePointsAndTangents[i][0]
+				      .plus(sideways.times(cag.sides[j].vertex0.pos.x))
+				      .plus(up.times(cag.sides[j].vertex0.pos.y))));
+
+	    // vertex1 should be the same as vertex0 of the next side,
+	    // so I don't need to handle it here
+	}
+    }
+    var shared = CSG.Polygon.defaultShared;
+
+    var start = 0;
+    var end = corners[0].length-1;
+    var nCorners = corners[0].length
+
+
+
+    //start cap
+    var startCap = [];
+    for (var j =nSides-1; j>=0; j--) {
+	startCap.push(corners[j][start]);
+    }
+    polygons.push(CSG.Polygon.createFromPoints(startCap, shared));
+
+//    polygons.push(CSG.Polygon.createFromPoints([corners4[start],corners3[start],
+//						corners2[start],corners1[start]],
+//					       shared));
+    for (var i = start; i < end; i++) {
+
+	// This is done as triangles, (rather than rectangles) because
+	// at points on the spline with high curvature, the inside
+	// corners can become twisted, which messes up the
+	// renderer. What I don't know is what happens when such a
+	// file is converted to STL and sent to a 3D printer.
+
+	// In the words of Shapeways, it makes the printer cry.
+
+	for (var j = 0; j < nSides; j++) {
+
+	    polygons.push(CSG.Polygon.createFromPoints([corners[j][i],  corners[(j+1)%nSides][i],
+						                        corners[j][i+1]],
+						        shared));
+	    polygons.push(CSG.Polygon.createFromPoints([              corners[(j+1)%nSides][i],
+						        corners[(j+1)%nSides][i+1],corners[j][i+1]],
+						       shared));
+	}
+    }
+    var endCap = [];
+    for (var j =0; j< nSides; j++) {
+	endCap.push(corners[j][end]);
+    }
+    polygons.push(CSG.Polygon.createFromPoints(endCap, shared));
+
+	return CSG.fromPolygons(polygons);
+}
+
+
+var controlPoints =
+    [
+	[0,     0,  1, 1],   //over across the middle
+	[10,  10, -1, 0],  //under the first cross
+	[20,  20,  1, 1],   //over the second cross
+//	[30,  24,  0, 0],   //curving into the corner
+	[39,  27.25,  0, 1],   // the sharp corner
+//	[32,  12,  0, 0],
+	[30,  10, -1, 0],
+//	[28,  8,   0, 0],
+	[20,  3.75,   0, 0],  // bottom of loop under the corner
+	[10,  10,  1, 1],
+	[4,   20,  0, 0], // grand curve near the sharp corner (under the long arc)
+////	[6,   26,  0, 0],
+//	[8,   28,  0, 0],
+	[10,  30, -1, 0],
+	[24,  34,  0, 0],
+//	[30,  35,  0, 0], // top of the long arc
+	[40,  34,  0, 0],
+	[50,  30,  1, 1], // about where the long arc crosses over
+//	[58,  22,  0, 0],
+	[60,  20, -1, 0],
+	[70,  10,  1, 1],
+	[75,  5,  0, 0],
+	[80,  0,  -1, 0],
+//	[79.9, .1, -1, 0],   // under the middle (2 cycles right)
+//	[79.95, .05, -1, 0],   // under the middle (2 cycles right)
+];
+
+var numberOfPatterns = 11;
+var circumference = 40 * numberOfPatterns;
+var radius = circumference / 2 / Math.PI;
+var targetCircumference = his?54.3:56.3;
+
+
+function main (params) {
+    his = (params.hisorhers == 0);
+    targetCircumference = his?54.3:56.3;
+
+    var up = new CSG.Vector3D(0,0,1);
+    var flipCP = controlPoints.slice();
+    flipCP.reverse();
+    flipCP = flipCP.map(function(elt) { return ([elt[0]*-1, elt[1]*-1,
+						 elt[2],    elt[3]]); });
+    // delete the repeated 0,0 point;
+    controlPoints.shift();
+    controlPoints = flipCP.concat(controlPoints);
+    if (!his) {
+	controlPoints = controlPoints.map(function(elt) {
+	    return ([elt[0], elt[1]*-1,
+		     elt[2]*-1,    elt[3]]); });
+    }
+    var splines = [];
+    var lastPoint ;
+    var tripleCP = [];
+    // one extra cycle before and after
+    for (var i=-1; i<numberOfPatterns+1; i++) {
+//    for (var i=-1; i<4+1; i++) {
+	tripleCP = tripleCP.concat(controlPoints.map(
+	    function(elt) { return ([elt[0]+(i*160), elt[1],
+				     elt[2], elt[3]]); }));
+	// delete final point so it's not duplicated
+	lastPoint = tripleCP.pop();
+    }
+    // put final point back after the last spline
+    tripleCP.push(lastPoint);
+
+    // delete all but last two points of the extra cycle
+    // ie. the start/end point and the extra control point
+    for (var i=0; i < controlPoints.length-2; i++) {
+	tripleCP.pop();
+	tripleCP.shift();
+    }
+
+    debugprint(tripleCP);
+    var vCP = tripleCP.map(function(e) {
+	return new CSG.Vector3D(e[0],e[1],e[2]);
+    });
+
+    var shape1 = CAG.fromPoints([[-4,0],
+				 [-4,5.0], [-1.5,8.5],
+				 [1.55,8.5], [4, 5.0],
+				 [4,0]]);
+
+    //	var shape1 = CAG.fromPoints([[-2.75,0], [0,2.75], [2.75,0]]);
+    splines.push(splineExtrude(vCP, 11, up, shape1, transformVec3DtoRingSpace));
+//        splines.push(splineExtrude(vCP, 11, up, shape1));
+    var csg = new CSG();
+    for (var i=0; i < splines.length; i++) {
+	csg = csg.union(splines[i]);
+    }
+
+    csg = csg.transform(CSG.Matrix4x4.rotationX(90));
+    csg = csg.scale(targetCircumference/circumference);
+    return csg;
+
+// 7.5 ring size is 17.7 mm diameter 55.7mm circumference
+// my guess as to my own ring size is 54mm
+
+// augh! the pass-under bits are 1 pre-scaled unit narrower
+// (after scaling, about 1/8 mm, so .4 mm in extra circumference.
+}
+
+function transformVec3DtoRingSpace (vec) {
+    var m = new CSG.Matrix4x4();
+
+    m = m.multiply(CSG.Matrix4x4.translation([-vec.x, 0, radius]));
+    m = m.multiply(CSG.Matrix4x4.rotationY(360*(vec.x)/circumference));
+    var res = vec.transform(m);
+    return res;
+}
+
+// Question: polygons are supposed to be coplanar vertices, but after
+// being transformed into ring space, are 4 coplanar vertices still
+// always coplanar?  I'm pretty sure the answer is 'No'.  Does this matter?
+// I think yes.  So I can generate triangles instead, easily enough.
+// Excpet the end caps... which for my model are not actually rotated,
+// because they are at the origin or exactly 11 loops away.
+
+
+</textarea>
+  <textarea id="servo_code" style="height: 500px">
+// This demo intends to show how to use properties and connectors.
+// The servoMotor() function constructs the shape of a standard servo
+// It also defines a property for the cutout shape, and a connector property
+// which can be used to correctly attach the motor to a surface.
+//
+// By using connectors, we don't need to know the actual orientation of each
+// object. Instead we just attach the two objects by attaching their connectors.
+//
+// The cutout shape is automatically transformed with every transformation of
+// the servo. We can simply subtract it from an object to make space for the servo
+// motor.
+function main(params)
+{
+  // the servo motor solid:
+  var servo = servoMotor();
+
+  // the plate:
+  var plate = CSG.cube({radius: [40,40,4]});
+
+  // Define a Connector on the plate, at the place where we want to attach the servo:
+  plate.properties.servoConnector = new CSG.Connector(
+    [0, 0, 4],    // point
+    [0, 0, 1],    // axis: pointing upwards
+    [2.5, 1.1, 0] // normal: use some random vector in the z plane
+  );
+
+  // Do some random rotations:
+  plate = plate.rotateX(25);
+  plate = plate.rotateZ(10);
+  // now we really don't know the orientation of the plane anymore!
+
+  // Still we can perfectly align the servo motor to the plane at the servoConnector
+  // point that we decided on earlier:
+  servo = servo.connectTo(
+    servo.properties.servomotor.surfaceConnector,   // the servo's pre defined Connector
+    plate.properties.servoConnector,                // the connector on the surface
+    false,                                          // we don't want to mirror; the Connector's axes should point in the same direction
+    0                                               // normalrotation; we could use it to rotate the servo in the plane
+  );
+
+  // Construct the result; use the parameters set by the end user:
+  var result = new CSG();
+  if(params.cutout != 0) plate = plate.subtract(servo.properties.servomotor.cutout);
+  if(params.showplate != 0) result = result.union(plate);
+  if(params.showservo != 0) result = result.union(servo);
+  if(params.showcutout != 0) result = result.union(servo.properties.servomotor.cutout.setColor(0,0.8,0));
+
+  return result;
+}
+
+// Here we define the user editable parameters:
+function getParameterDefinitions() {
+  return [
+    { name: 'showservo', caption: 'Show servo:', type: 'choice', values: [0, 1], default: 1, captions: ["No", "Yes"]},
+    { name: 'showplate', caption: 'Show plate:', type: 'choice', values: [0, 1], default: 1, captions: ["No", "Yes"]},
+    { name: 'showcutout', caption: 'Show cutout:', type: 'choice', values: [0, 1], default: 0, captions: ["No", "Yes"]},
+    { name: 'cutout', caption: 'Subtract the servo cutout shape from the plate:', type: 'choice', values: [0, 1], default: 1, captions: ["No", "Yes"]},
+  ];
+}
+
+// The servoMotor() function constructs the shape of a standard '3003' servo
+// Returns a CSG solid. The solid has the following additional properties:
+//    .properties.servomotor.cutout: a CSG solid that can be used to create a cutout for the servo motor (including screw holes)
+//    .properties.servomotor.surfaceConnector: a CSG.Connector that can be used to attach the servo motor to a surface
+function servoMotor()
+{
+  var width = 20;
+  var length = 40.5;
+  var h1 = 26.5;
+  var h2 = 29;
+  var h4 = 35.9;
+  var l1 = 55.4;
+  var w1 = 17.8;
+  var holeradius = 2.1;
+  var holex1 = 2 * 2.54;
+  var holey1 = 9.5 * 2.54;
+  var cutoutmargin = 1;
+  var shaftradius = 3;
+  var shafty = 9.25;
+  var shafttop = 43;
+  var cyl2radius = 7;
+  var cyl2height = 2;
+
+  var resolution = 16; // for all circular objects
+
+  // result: this is the solid in which we will store the servomotor
+  var result = CSG.cube({radius:[width/2, length/2, h4/2]});
+
+  // cutout: this is the solid for the cutout. It is never rendered directly,
+  // but it will be returned as a property of the resulting solid.
+  // it can be used to cutout the shape of the servo motor and screw holes
+  // from another solid
+  var cutout = CSG.cube({radius:[width/2+cutoutmargin, length/2+cutoutmargin, h4/2+cutoutmargin]});
+
+  // add a 'bottomface' property. Since the cube already has predifined connectors at each face,
+  // we can just copy the 5th:
+  result.properties.servomotor = new CSG.Properties();
+  result.properties.servomotor.bottomface = result.properties.cube.facecenters[5];
+
+  // get the z coordinate of the bottom face:
+  var bottomz = result.properties.servomotor.bottomface.point.z;
+
+  // the tabs at the end containing the screw holes:
+  var cube2 = CSG.cube({radius:[w1/2, l1/2, (h2-h1)/2]});
+  cube2 = cube2.translate([0, 0, (h2-h1)/2 + bottomz + h1]);
+  result = result.union(cube2);
+
+  // create the cylinders for cutting out the screw holes:
+  for(var hole = 0; hole < 4; hole++)
+  {
+    var xoffset = (hole & 1)? holex1 : -holex1;
+    var yoffset = (hole & 2)? holey1 : -holey1;
+    var cylstart = new CSG.Vector3D([xoffset, yoffset, bottomz+h2]);
+    var cylend = new CSG.Vector3D([xoffset, yoffset, bottomz]);
+    var cutoutcylinder = CSG.cylinder({start: cylstart, end: cylend, radius: holeradius, resolution: resolution});
+
+    // create the screw hole in the tabs:
+    result = result.subtract(cutoutcylinder);
+
+    // And also add the cutout cylinder to the cutout shape:
+    cutout = cutout.union(cutoutcylinder);
+  }
+
+  // cylinder at top:
+  var p1 = new CSG.Vector3D([0, shafty, bottomz+h4]);
+  p2 = p1.plus(new CSG.Vector3D([0, 0, cyl2height]));
+  var cyl = CSG.cylinder({start: p1, end: p2, radius: cyl2radius, resolution: resolution});
+  result = result.union(cyl);
+
+  // make the entire motor grey:
+  result = result.setColor(0.2,0.2,0.2);
+
+  // create the shaft:
+  p1 = new CSG.Vector3D([0, shafty, bottomz+h4]);
+  p2 = p1.plus(new CSG.Vector3D([0, 0, cyl2height]));
+  var shaft = CSG.cylinder({start: [0, shafty, bottomz+h4], end: [0, shafty, bottomz+shafttop], radius: shaftradius, resolution: resolution});
+  shaft = shaft.setColor(1,1,1);
+  result = result.union(shaft);
+
+  // add the cutout solid to the properties:
+  result.properties.servomotor.cutout = cutout;
+
+  // Add a Connector to facilitate proper alignment of the servo motor to a surface
+  //   The connector's point is at the x/y center of the box, in the bottom plane of the tabs
+  //   The connector's axis points towards the top of the box
+  //   The connector's normal points towards one of the tabs at the side
+  result.properties.servomotor.surfaceConnector = new CSG.Connector(
+    [0, 0, bottomz+h1],    // point
+    [0, 0, 1],             // axis
+    [0, 1, 0]              // normal
+  );
+
+  return result;
+}
+</textarea><br>
+<input type="submit" value="Update" onclick="updateSolid(document.getElementById('example_options').value); return false;">
+<br>
+<h2>About</h2>
+OpenJsCad is a 2D and 3D modeling tool similar to <a href="http://www.openscad.org/">OpenSCAD</a>,
+but web based and using Javascript language. For example:<br>
+<pre>function main() {
+  var cube = CSG.cube(); 
+  return cube;
+}</pre>
+creates a cube with a radius of 1 and centered at the origin.
+The code should always contain a main() function. The main() function should return a CSG object (for a 3D solid)
+or a CAG object (for a 2D area). It's also possible to return multiple objects (a dropdown box will be shown to select the
+part to be displayed), see <a href="#renderingmultipleobjects">rendering multiple objects</a>.
+<br><br>
+3D solids can be exported as STL files, 2D areas can be exported in a DXF file. 
+<br><br>
+To build your own models, create a .jscad file with your javascript code and parse the file using the 
+<a href="processfile.html">OpenJsCad parser</a>. When finished, click on Generate STL and save the result
+in an .stl file, ready to be printed on your 3d printer.
+<h2>Why use OpenJsCad?</h2>
+Some of the benefits:
+<ul>
+<li>Runs in your browser, no need to install any software.</li>
+<li>You can create parametric models with user editable parameters: parameters can be changed in the browser window,
+without the need to edit the source script. See the Gears demo at the top of this page for example.</li>
+<li>JavaScript is an extremely flexible language, supporting dynamic arrays, object oriented programming, closures, anonymous functions and more</li>
+<li>Solids are stored in variables. This allows for example conditional cloning of objects, something which is nearly impossible in OpenSCAD.</li>
+<li>Properties and Connectors (see below) make it very easy to attach objects to each other at predetermined
+points, even if you don't know the actual orientation or size.</li>
+<li>Extensive built in <a href="#math">support for 2D and 3D math</a> (classes for Vector2D, Vector3D, Plane, Line3D, Line2D)</li>
+<li>Debugging support: step through your code, set breakpoints, inspect variables, etc. See the 
+    <a href="processfile.html">OpenJsCad parser</a> for details.</li>
+</ul>
+<h2>Viewer navigation</h2>
+Click and drag to rotate the model around the origin. Hold down Alt to change the axis of rotation. 
+Shift+Drag moves the model around. Zoom using the mouse wheel or using the slider below the model.
+<h2>Demos</h2>
+<ul>
+<li><a href="gearsdemo.jscad">Involute Gears</a></li>
+<li><a href="hookdemo.jscad">Parametric S hook</a>: shows how to extrude 2d paths</li>
+<li><a href="servodemo.jscad">Servo motor</a>: shows how to work with properties and connectors</li>
+<li><a href="grilledemo.jscad">Parametric Grille</a></li>
+<li><a href="couplerdemo.jscad">Parametric Axis Coupler</a></li>
+<li><a href="lampshadedemo.jscad">Parametric Lamp Shade</a>: creating 2D panels (for CNC / laser cutting) from a 3D design</li>
+<li><a href="ringdemo.jscad">Celtic Knot Ring</a></li>
+</ul>
+<h2>Tools, Libraries</h2>
+<ul>
+<li><a href="https://github.com/Spiritdude/OpenSCAD.jscad">OpenSCAD.jscad</a>: Wrapper functions to ease the 
+  translation from OpenSCAD to OpenJsCad, and command line rendering (with node.js) (by René K. Müller)</li>
+</ul>
+<h2>License</h2>
+OpenJsCad is developed by <a href="https://github.com/joostn">Joost Nieuwenhuijse</a>.
+Based on <a href="https://github.com/evanw/csg.js">initial CSG.js</a> copyright (c) 2011 <a href="https://github.com/evanw">Evan Wallace</a>.
+Uses <a href="https://github.com/evanw/lightgl.js">lightgl.js</a> by <a href="https://github.com/evanw">Evan Wallace</a> 
+and <a href="https://github.com/toaarnio">Tomi Aarnio</a> for WebGL rendering. 
+Contributions by <a href="https://github.com/alx">Alexandre Girard</a>, 
+<a href="https://github.com/tlrobinson">Tom Robinson</a>,
+ <a href="https://github.com/jboecker">jboecker</a>,
+ <a href="https://github.com/risacher">risacher</a> and
+ <a href="https://github.com/tedbeer">tedbeer</a>.
+All code released under MIT license.
+<br><br>
+Contributions are welcome! It's all written in Javascript, so if you know how to use it you
+know how to modify it as well.
+To contribute go to <a href="https://github.com/joostn/OpenJsCad/tree/gh-pages">OpenJsCad at GitHub (gh-pages tree)</a>,
+<a href="http://help.github.com/fork-a-repo/">create your own fork</a> and 
+<a href="http://help.github.com/send-pull-requests/">send me a pull request</a>. Note that the code is maintained 
+in the gh-pages branch, not the master branch. This is so that it can be accessed directly via Github pages.
+<h2>Primitive solids</h2>
+Currently the following solids are supported. The parameters are passed in an object; most
+parameters are optional. 3D vectors can be passed in an array. If a scalar is passed
+for a parameter which expects a 3D vector, it is used for the x, y and z value.
+In other words: <code>radius: 1</code> will give <code>radius: [1,1,1]</code>.
+<br><br>
+All rounded solids have a 'resolution' parameter which controls tesselation. If resolution
+is set to 8, then 8 polygons per 360 degree of revolution are used. Beware that rendering
+time will increase dramatically when increasing the resolution. For a sphere the number of polygons
+increases quadratically with the resolution used. If the resolution parameter is omitted, the following
+two global defaults are used: CSG.defaultResolution2D and CSG.defaultResolution3D. The former
+is used for 2D curves (circle, cylinder), the latter for 3D curves (sphere, 3D expand).
+<br><br> 
+<pre>
+// a cube:
+var cube = CSG.cube({
+  center: [0, 0, 0],
+  radius: [1, 1, 1]
+});
+
+// or alternatively by specifying two diagonally opposite corners:
+var cube = CSG.cube({
+  corner1: [-10, 5, 10],
+  corner2: [10, -5, 1]
+});
+
+// a sphere:
+var sphere = CSG.sphere({
+  center: [0, 0, 0],
+  radius: 2,            // must be scalar
+  resolution: 32        // optional
+});
+
+// a cylinder:
+var cylinder = CSG.cylinder({
+  start: [0, -1, 0],
+  end: [0, 1, 0],
+  radius: 1,
+  resolution: 16        // optional
+});
+
+// a cone:
+var cone = CSG.cylinder({
+  start: [0, -1, 0],
+  end: [0, 1, 0],
+  radiusStart: 1,
+  radiusEnd: 2,
+  resolution: 16        // optional
+});
+
+// a cone or cylinder sector:
+var coneSector = CSG.cylinder({
+  start: [0, 0, -1],
+  end: [0, 0, 1],
+  radiusStart: 2,
+  radiusEnd: 1,
+  sectorAngle: 90,
+  resolution: 16        // optional
+});
+
+// like a cylinder, but with spherical endpoints:
+var roundedCylinder = CSG.roundedCylinder({
+  start: [0, -1, 0],
+  end: [0, 1, 0],
+  radius: 1,
+  resolution: 16        // optional
+});
+
+// a rounded cube:
+var cube = CSG.roundedCube({
+  corner1: [-10, 5, 10],
+  corner2: [10, -5, 1]
+  roundradius: 3,
+  resolution: 8,        // optional
+});
+
+// a polyhedron (point ordering for faces: when looking at the face from the outside inwards, the points must be clockwise):
+var polyhedron = CSG.polyhedron({
+   points:[ [10,10,0],[10,-10,0],[-10,-10,0],[-10,10,0], // the four points at base
+            [0,0,10]  ],                                 // the apex point 
+   faces:[ [0,1,4],[1,2,4],[2,3,4],[3,0,4],              // each triangle side
+               [1,0,3],[2,1,3] ]                         // two triangles for square base
+});
+</pre>
+ 
+<h2>CSG operations</h2>
+The 3 standard CSG operations are supported. All CSG operations return a new solid; the source solids
+are not modified:
+<pre>
+var csg1 = cube.union(sphere);
+var csg2 = cube.intersect(sphere);
+var csg3 = cube.subtract(sphere);
+
+// combine multiple solids in one go (faster):
+var csg1 = cube.union([solid1, solid2, solid3]);
+var csg2 = cube.intersect([solid1, solid2, solid3]);
+var csg3 = cube.subtract([solid1, solid2, solid3]);
+</pre>
+
+<h2>Transformations</h2>
+Solids can be translated, scaled and rotated. Multiple transforms can be combined into a single matrix transform.
+For <a href="#math">matrix and vector math see below</a>.
+<pre>
+var cube = CSG.cube();
+
+// translation:
+var cube2 = cube.translate([1, 2, 3]);
+
+// scaling:
+var largecube = cube.scale(2.0);
+var stretchedcube = cube.scale([1.5, 1, 0.5]);
+
+// rotation:
+var rotated1 = cube.rotateX(-45); // rotate around the X axis
+var rotated2 = cube.rotateY(90);  // rotate around the Y axis
+var rotated3 = cube.rotateZ(20);  // rotate around the Z axis
+
+// combine multiple transforms into a single matrix transform:
+var m = new CSG.Matrix4x4();
+m = m.multiply(CSG.Matrix4x4.rotationX(40));
+m = m.multiply(CSG.Matrix4x4.rotationZ(40));
+m = m.multiply(CSG.Matrix4x4.translation([-.5, 0, 0]));
+m = m.multiply(CSG.Matrix4x4.scaling([1.1, 1.2, 1.3]));
+
+// and apply the transform:
+var cube3 = cube.transform(m);
+</pre>
+
+<h2>Mirroring</h2>
+Solids can be mirrored in any plane in 3D space. For <a href="#math">plane math see below</a>.
+<pre>
+var cube = CSG.cube().translate([1,0,0]);
+
+var cube2 = cube.mirroredX(); // mirrored in the x=0 plane
+var cube3 = cube.mirroredY(); // mirrored in the y=0 plane
+var cube4 = cube.mirroredZ(); // mirrored in the z=0 plane
+
+// create a plane by specifying 3 points:
+var plane = CSG.Plane.fromPoints([5,0,0], [5, 1, 0], [3, 1, 7]);
+
+// and mirror in that plane:
+var cube5 = cube.mirrored(plane);
+</pre>
+
+<h2>Cutting by a plane</h2>
+A solid can be cut by a plane; only the part on the back side is kept:
+
+<pre>
+var cube = CSG.cube({radius: 10});
+
+// create a plane by specifying 3 points:
+var plane1 = CSG.Plane.fromPoints([5,0,0], [7, 1, 0], [3, 1, 7]);
+
+// or by specifying a normal and a point on the plane:
+var plane2 = CSG.Plane.fromNormalAndPoint([3, 1, 2], [5, 0, 0]);
+
+// and cut by the plane:
+var part1 = cube.cutByPlane(plane2);
+
+// or if we need the other half of the cube:
+var part2 = cube.cutByPlane(plane2.flipped());
+</pre>
+
+
+<h2>Expansion and contraction</h2>
+Expansion can be seen
+as the 3D convolution of an object with a sphere. Contraction is the reverse: the area outside the solid
+is expanded, and this is then subtracted from the solid.
+<br><br>
+Expansion and contraction are very powerful ways to get an object with nice smooth corners. For example
+a rounded cube can be created by expanding a normal cube. 
+<br><br>
+Note that these are expensive operations: spheroids are created around every corner and edge in the original
+object, so the number of polygons quickly increases. Expansion and contraction therefore are only practical for simple 
+non-curved objects. 
+<br><br>
+expand() and contract() take two parameters: the first is the radius of expansion or contraction; the second
+parameter is optional and specififies the resolution (number of polygons on spherical surfaces, per 360 degree revolution).
+<pre>
+var cube1 = CSG.cube({radius: 1.0});
+var cube2 = CSG.cube({radius: 1.0}).translate([-0.3, -0.3, -0.3]);
+var csg = cube1.subtract(cube2);
+var rounded = csg.expand(0.2, 8); 
+</pre>
+
+<h2>Using Properties</h2>
+The 'property' property of a solid can be used to store metadata for the object,
+for example the coordinate of a specific point of interest of the solid. Whenever
+the object is transformed (i.e. rotated, scaled or translated), the properties 
+are transformed with it. So the property will keep pointing to the same point
+of interest even after several transformations have been applied to the solid.
+<br><br>
+Properties can have any type, but only the properties of classes supporting
+a 'transform' method will actually be transformed. This includes CSG.Vector3D,
+CSG.Plane and CSG.Connector. In particular CSG.Connector properties (see below) 
+can be very useful: these can
+be used to attach a solid to another solid at a predetermined location regardless of the 
+current orientation. 
+<br><br>
+It's even possible to include a CSG solid as a property of another solid. This could
+be used for example
+to define the cutout cylinders to create matching screw holes for an object. Those 'solid properties'
+get the same transformations as the owning solid but they will not be visible in the result 
+of CSG operations such as union().
+<br><br>
+Other kind of properties (for
+example, strings) will still be included in the properties of the transformed
+solid, but the properties will not get any transformation when the owning solid is transformed. <br><br>
+All primitive solids have some predefined properties, such as the center point
+of a sphere (TODO: document).
+<br><br>
+The solid resulting from CSG operations (union(), subtract(), intersect()) will get
+the merged properties of both source solids. If identically named properties exist, only
+one of them will be kept.
+<pre>
+var cube = CSG.cube({radius: 1.0});
+cube.properties.aCorner = new CSG.Vector3D([1, 1, 1]);
+cube = cube.translate([5, 0, 0]);
+cube = cube.scale(2);
+// cube.properties.aCorner will now point to [12, 2, 2],
+// which is still the same corner point 
+
+// Properties can be stored in arrays; all properties in the array
+// will be transformed if the solid is transformed:
+cube.properties.otherCorners = [
+  new CSG.Vector3D([-1, 1, 1]),
+  new CSG.Vector3D([-1, -1, 1])
+];
+
+// and we can create sub-property objects; these must be of the 
+// CSG.Properties class. All sub properties will be transformed with
+// the solid:
+cube.properties.myProperties = new CSG.Properties();
+cube.properties.myProperties.someProperty = new CSG.Vector3D([-1, -1, -1]);
+</pre>
+For an example see the <a href="servodemo.jscad">Servo motor</a> demo.
+
+<h2>Connectors</h2>
+The CSG.Connector class is intended to facilitate 
+attaching two solids to each other at a predetermined
+location and orientation. 
+For example suppose we have a CSG solid depicting a servo motor
+and a solid of a servo arm: by defining a Connector property for each of them, we
+can easily attach the servo arm to the servo motor at the correct position
+(i.e. the motor shaft) and orientation (i.e. arm perpendicular to the shaft) 
+even if we don't know their current position and orientation
+in 3D space.<br><br>
+In other words Connector give us the freedom to rotate and translate objects at will without the need
+to keep track of their positions and boundaries. And if a third party library exposes connectors for
+its solids, the user of the library does not have to know the actual dimensions or
+shapes, only the names of the connector properties.
+<br><br>
+A CSG.Connector consist of 3 properties:<br>
+<b>point</b>: a CSG.Vector3D defining the connection point in 3D space<br>
+<b>axis</b>: a CSG.Vector3D defining the direction vector of the connection 
+(in the case of the servo motor example it would point in the direction of the shaft)<br>
+<b>normal</b>: a CSG.Vector3D direction vector somewhat perpendicular to axis; this
+defines the &quot;12 o'clock&quot; orientation of the connection.
+<br><br>
+When connecting two connectors, the solid is transformed such that the <b>point</b>
+properties will be identical, the <b>axis</b> properties will have the same direction
+(or opposite direction if mirror == true), and the <b>normal</b>s match as much as possible.
+<br><br>
+Connectors can be connected by means of two methods:<br>
+A CSG solid's <b>connectTo()</b> function transforms a solid such that two connectors
+become connected.<br>
+Alternatively we can use a connector's <b>getTransformationTo()</b> method to obtain
+a transformation matrix which would connect the connectors. This can be used if we
+need to apply the same transform to multiple solids.
+
+<pre>
+var cube1 = CSG.cube({radius: 10});
+var cube2 = CSG.cube({radius: 4});
+
+// define a connector on the center of one face of cube1
+// The connector's axis points outwards and its normal points
+// towards the positive z axis:
+cube1.properties.myConnector = new CSG.Connector([10, 0, 0], [1, 0, 0], [0, 0, 1]);
+
+// define a similar connector for cube 2:
+cube2.properties.myConnector = new CSG.Connector([0, -4, 0], [0, -1, 0], [0, 0, 1]);
+
+// do some random transformations on cube 1:
+cube1 = cube1.rotateX(30);
+cube1 = cube1.translate([3.1, 2, 0]);
+
+// Now attach cube2 to cube 1:
+cube2 = cube2.connectTo(
+  cube2.properties.myConnector, 
+  cube1.properties.myConnector, 
+  true,   // mirror 
+  0       // normalrotation
+);
+
+// Or alternatively:
+var matrix = cube2.properties.myConnector.getTransformationTo(
+  cube1.properties.myConnector, 
+  true,   // mirror 
+  0       // normalrotation
+);
+cube2 = cube2.transform(matrix);
+
+var result = cube2.union(cube1);
+
+</pre>
+For a more complete example see the <a href="servodemo.jscad">Servo motor</a> demo.
+
+<h2>Determining the bounds of an object, lay object onto surface</h2>
+The getBounds() function can be used to retrieve the bounding box of an object.
+getBounds() returns
+an array with two CSG.Vector3Ds specifying the minimum x,y,z coordinate and the maximum x,y,z coordinate.
+<br><br>
+lieFlat() lays an object onto the z=0 surface, in such a way that the z-height is minimized and it is centered around
+the z axis.
+This can be useful for CNC milling: it will transform a part of an object into the space 
+of the stock material during milling. Or for 3D printing: it is laid in such a way that it can be printed with
+minimal number of layers.
+Instead of lieFlat() the function getTransformationToFlatLying() can be used, which returns a CSG.Matrix4x4 for the 
+transformation. Or use getTransformationAndInverseTransformationToFlatLying() to get both the forward transformation
+and the reverse transformation.
+<pre>
+var cube1 = CSG.cube({radius: 10});
+var cube2 = CSG.cube({radius: 5});
+
+// get the right bound of cube1 and the left bound of cube2:
+var deltax = cube1.getBounds()[1].x - cube2.getBounds()[0].x;
+
+// align cube2 so it touches cube1:
+cube2  = cube2.translate([deltax, 0, 0]);
+
+var cube3 = CSG.cube({radius: [100,120,10]});
+// do some random transformations:
+cube3 = cube3.rotateZ(31).rotateX(50).translate([30,50,20]);
+// now place onto the z=0 plane:
+cube3  = cube3.lieFlat();
+
+// or instead we could have used:
+var transformation = cube3.getTransformationToFlatLying();
+cube3 = cube3.transform(transformation);
+
+// or:
+var obj = cube3.getTransformationAndInverseTransformationToFlatLying();
+var forwardtransformation=obj[0];
+var backtransformation=obj[1];
+cube3 = cube3.transform(forwardtransformation);
+
+return cube3;
+
+
+</pre>
+
+<h2>2D shapes</h2>
+Two dimensional shapes can be defined through the CAG class. CAG stands for 'Constructive Area Geometry' which is the 2D
+variant of CSG. Arbitrary shapes can be constructed through CAG.fromPoints(), or one of the primitives CAG.circle(),
+CAG.rectangle() or CAG.roundedRectangle() can be used. Most of the operations for 3D CSG solids are defined for 2D CAG shapes
+as well:
+<ul>
+  <li>union, subtract, intersect</li> 
+  <li>translate, scale, rotate, mirror. For rotation rotateZ() should be used, which rotates about the origin.</li>
+  <li>expand(), contract()</li>
+</ul>
+CAG shapes can be converted into a 3D solid through extrusion:
+<ul>
+<li>The extrude() function
+places the 2D area onto the 3D z=0 plane, and extrudes in the specified direction. Extrusion can be done with an optional
+twist. This rotates the solid around the z axis (and not necessariy around the extrusion axis) during extrusion.  
+The total degrees of rotation is specified in the twistangle parameter, and twiststeps determine the number of steps
+between the bottom and top surface.</li>
+<li>To extrude in an arbitrary plane in 3D space, use extrudeInOrthonormalBasis(orthonormalbasis, depth). 
+An orthonormal basis is a combination of a plane and a right-hand vector (read more about orthonormal bases below).
+depth is the extrusion thickness. This function extrudes symmetrically: half of the extrusion is in front of the plane, half is
+back from the plane.
+</li>
+<li>To extrude in one of the standard cartesian planes, use extrudeInPlane(axis1, axis2, depth). axis1 and axis 2 are one
+   of ["X","Y","Z","-X","-Y","-Z"]. The 2D X coordinate is mapped to the 3D axis specified by axis1, and the 2D
+Y coordinate is mapped to the 3D axis specified by axis2. For example, extrudeInPlane("-Z","X", 10) extrudes such that the
+2D x coordinate maps to the 3D negated z coordinate, and the 2D y coordinate maps to the 3D x coordinate.</li>
+</ul>
+A 3D solid can be converted back to a 2D CAG using sectionCut() and projectToOrthoNormalBasis().
+sectionCut() cuts the solid by a plane and returns the 2D intersection as a CAG object.
+projectToOrthoNormalBasis() works similarly but instead of cutting by a thin plane, it can be seen as 
+the projection of the solid onto a plane
+using a distant light source; the result is a CAG representing the shadow of the object. 
+Both functions take a CSG.OrthoNormalBasis as the argument. An orthonormal basis is a combination of a plane and
+a right-hand vector (read more about orthonormal bases below).
+<br><br>
+Note that your main() function may return a CAG object: in this case OpenJsCad will display it as a 'thin' 3D
+shape. The result can be exported as a DXF file, ready for laser cutting or CNC routing.
+<pre>
+// Create a shape; argument is an array of 2D coordinates
+var shape1 = CAG.fromPoints([[0,0], [5,0], [3,5], [0,5]]);
+
+// 2D primitives:
+var shape2 = CAG.circle({center: [-2, -2], radius: 4, resolution: 20});
+var shape3 = CAG.rectangle({center: [5, -2], radius: [2, 3]});
+var shape4 = CAG.rectangle({corner1: [-10, 20], corner2: [15, -30]});
+var shape5 = CAG.roundedRectangle({center: [5, 7], radius: [4, 4], roundradius: 1, resolution: 24});
+var shape6 = CAG.roundedRectangle({corner1: [-2, 3], corner2: [4, -4], roundradius: 1, resolution: 24});
+
+// Expand one of the shapes: first parameter is expand radius, second is the resolution:
+shape1 = shape1.expand(1, 20);
+
+var shape = shape1.union([shape2, shape3, shape4]);
+
+// Do some transformations:
+shape=shape.translate([-2, -2]);
+shape=shape.rotateZ(20);
+shape=shape.scale([0.7, 0.9]);
+
+// And extrude. This creates a CSG solid:
+var extruded = shape.extrude({
+  offset: [0.5, 0, 10],   // direction for extrusion
+  twistangle: 30,       // top surface is rotated 30 degrees 
+  twiststeps: 10        // create 10 slices
+});
+
+// extrude such that the 2D x coordinate maps to the 3D negated z coordinate, 
+// and the 2D y coordinate maps to the 3D x coordinate:
+var extruded2 = shape.extrudeInPlane("-Z","X", 10);
+
+
+// extrude by rotation around y-axis at the origin.
+// Note: for this to work, shape shouldn't have point in negative x space
+var shapeX = shape.translate([20, 0]);
+var rotExtruded = shapeX.rotateExtrude({
+  angle: 210,        // degrees of rotation; 360 deg if left out
+  resolution: 200    // resolution, optional
+});
+
+var cube2d = CSG.cube({radius: 10}).rotateZ(45);
+var z0basis = CSG.OrthoNormalBasis.Z0Plane();
+var cag = cube2d.sectionCut(z0basis);
+// or:
+var cag = cube2d.projectToOrthoNormalBasis(z0basis);
+</pre>
+Using a CNC router it's impossible to cut out a true sharp inside corner. The inside corner
+will be rounded due to the radius of the cutter. The CAG.overCutInsideCorners(radius) function compensates for this by creating 
+an extra cutout at each inner corner so that the actual cut out shape will be at least as large
+as needed:
+<pre>
+var r1=CAG.rectangle({center:[0,0], radius: 4});
+var r2=CAG.rectangle({center:[2,0], radius: 2});
+var r3=r1.subtract(r2);
+var cutterradius=1;
+var r4=r3.overCutInsideCorners(cutterradius);
+
+return r4;
+</pre>
+
+For an example of 2D shapes see the <a href="hookdemo.jscad">Parametric S hook</a> demo.
+
+<h2>2D Paths</h2>
+A path is simply a series of points, connected by lines. A path can be open or closed (an additional line
+is drawn between the first and last point). 2D paths are supported through the CSG.Path2D class.
+<br><br>
+The difference between a 2D Path and a 2D CAG is that a path is a 'thin' line, whereas a CAG is an enclosed
+area.
+<br><br>
+Paths can be contructed either by giving a series of 2D coordinates, or through the CSG.Path2D.arc() function,
+which creates a circular curved path. Paths can be concatenated, the result is a new path.
+<br><br>
+A path can be converted to a CAG in two ways:
+<ul>
+<li>expandToCAG(pathradius, resolution) traces the path with a circle, in effect making the path's line segments
+thick.</li>
+<li>innerToCAG() creates a CAG bounded by the path. The path should be a closed path.</li>
+</ul>
+
+Creating a 3D solid is currently supported by the rectangularExtrude() function. This creates a 3D shape
+by following the path with a 2D rectangle (upright, perpendicular to the path direction).
+<pre>
+var path = new CSG.Path2D([[10,10], [-10,10]], /* closed = */ false);
+var anotherpath = new CSG.Path2D([[-10,-10]]);
+path = path.concat(anotherpath);
+path = path.appendPoint([10,-10]);
+path = path.close(); // close the path
+
+// of course we could simply have done:
+// var path = new CSG.Path2D([[10,10], [-10,10], [-10,-10], [10,-10]], /* closed = */ true);
+
+// We can make arcs and circles. Two methods are provided:
+// arc() creates an circular segment with a specified center and radius:
+var curvedpath = CSG.Path2D.arc({
+  center: [0,0,0],
+  radius: 10,
+  startangle: 0,
+  endangle: 180,
+  resolution: 16,
+});
+
+// or appendArc() can be used to create a circular or elliptical segment between two endpoints.
+// appendArc() closely follows the SVG arc specification:
+// http://www.w3.org/TR/SVG/paths.html#PathDataEllipticalArcCommands
+// The starting point for the arc is the current endpoint of the path
+// path2d = path2d.appendArc(endpoint, options);
+// endpoint is the destination coordinate
+// options:
+//      .resolution      // smoothness of the arc (number of segments per 360 degree of rotation)
+// to create a circular arc:
+//      .radius
+// to create an elliptical arc:
+//      .xradius
+//      .yradius
+//      .xaxisrotation   // the rotation (in degrees) of the x axis of the ellipse with respect 
+//                       // to the x axis of our coordinate system
+// this still leaves 4 possible arcs between the two given points. The following two flags select which one we draw:
+//      .clockwise       // = true | false (default is false). Two of the 4 solutions draw clockwise with respect to 
+//                       // the center point, the other 2 counterclockwise
+//      .large           // = true | false (default is false). Two of the 4 solutions are an arc longer than 180 
+//                       // degrees, the other two are <= 180 degrees
+var curvedpath2 = new CSG.Path2D([[0,0], [10,0]]); 
+// create an elliptical arc from [10,0] to [15,0]:
+curvedpath2 = curvedpath2.appendArc([15,0], {
+  xradius: 4,
+  yradius: -6,
+  xaxisrotation: 30,
+  resolution: 48,
+  clockwise: false,
+  large: true,
+});
+
+// Extrude the path by following it with a rectangle (upright, perpendicular to the path direction)
+// Returns a CSG solid
+//   width: width of the extrusion, in the z=0 plane
+//   height: height of the extrusion in the z direction
+//   resolution: number of segments per 360 degrees for the curve in a corner
+//   roundEnds: if true, the ends of the polygon will be rounded, otherwise they will be flat
+var csg = path.rectangularExtrude(3, 4, 16, true);
+return csg;
+</pre>
+
+<h2>2D Bézier curves</h2>
+Smooth 2D shapes can be constructed using CSG.Path2D's appendBezier() method. A Bézier curve is a smooth line between
+two endpoints, guided by control points. The curve in general only passes through the endpoints. The intermediate control points guide the
+curve in a certain direction but the curve in general does not go through the intermediate control points.
+In vector image editing applications (such as Inkscape) usually cubic Bézier are used: such a curve has two control points inbetween the 
+two endpoints. But in fact appendBezier() supports any order Bézier curve.
+<pre>
+path2d.appendBezier(controlpoints[, options]) - create a single Bézier segment
+
+controlpoints: an array of control points. Each control point is a 2d coordinate (can be an [x,y] array 
+  or a CSG.Vector2D). The Bézier curve starts at the last point in the existing path2d (hence path2d must
+  not be empty), and ends at the last given control point. Other control points are intermediate control points.
+  The first control point may be null. In that case a smooth transition is ensured: the null control 
+  point is replaced by the second last control point of the previous Bézier curve mirrored into the
+  starting point of this curve. In other words the incoming gradient matches the outgoing gradient at 
+  the current starting point.
+
+options: an optional object. Currently only one option is supported:
+  resolution: controls the smoothness of the curve: at least this number of segments will be used per 
+  360 degree rotation. If omitted, CSG.defaultResolution2D will be used.
+</pre>
+An example:
+<pre>
+var path=new CSG.Path2D([[0,0]]);  // beware of the double array: we must pass an array of 2d coordinates
+
+// bezier curve from [0,0] to [10,10]
+// with 3 intermediate control points so it is a 3rd order bezier
+// Since we do not give a resolution option, CSG.defaultResolution2D is used to determine the number of vertices
+path = path.appendBezier([[2,8], [5,0], [8,6], [10,10]]);
+
+// cubic bezier curve from [10,10] to [10,0]
+// first control point is null: this forces a smooth transition from the previous bezier curve
+// In this case the null control point will be replaced by [10,10]+([10,10]-[8,6]) = [12,14]
+// i.e. the last control point will be mirrored
+// Here we give the optional options object, setting a resolution of 24 steps per 360 degree of revolution
+// So the angle between each subsequent side is guaranteed to be less than 15 degrees
+path = path.appendBezier([null, [10,0]], {resolution: 24});
+
+// close the path and convert to a solid 2D shape:
+path = path.close();
+var cag = path.innerToCAG();
+
+return cag;
+</pre>
+
+
+<h2>Interactive parametric models</h2>
+It is possible to make certain parameters
+editable in the browser. This allows users not familiar with JavaScript to create customized STL files.
+<br><br>
+To do so, add a function getParameterDefinitions() to your .jscad source. This function should return
+an array with parameter definitions. Currently 6 parameters types are supported: float, int, text, longtext, bool and choice.
+The user edited values of the parameters will be supplied as an object parameter to the main() function of your .jscad file.
+<br><br>
+A float, int, bool or text parameter is created by including the following object in the array returned by getParameterDefinitions(): 
+<pre>{
+  name: 'width',
+  type: 'float',                      // or 'text', 'int', 'longtext', 'bool'
+  initial: 1.23,                      // optional, sets the initial value
+  // 'default': 1.23                  // this is still supported for backward compatibility but deprecated ('default' is a Javascript keyword)
+  caption: 'Width of the thingy:',    // optional, displayed left of the input field
+                                      // if omitted, the 'name' is displayed (i.e. 'width')
+}</pre> 
+A 'choice' parameter is created using the following object:
+<pre>{
+  name: 'shape',
+  type: 'choice',
+  values: ["TRI", "SQU", "CIR"],               // these are the values that will be supplied to your script
+  captions: ["Triangle", "Square", "Circle"],  // optional, these values are shown in the listbox
+                                               // if omitted, the items in the 'values' array are used
+  caption: 'Shape:',                           // optional, displayed left of the input field
+  initial: "SQU",                              // optional, default selected value
+                                               // if omitted, the first item is selected by default
+}</pre>
+To use the values add an argument to your main() function. This argument will be supplied an object
+with the user edited parameter values:
+<pre>
+function main(params)
+{
+  // custom error checking:
+  if(params.width <= 0) throw new Error("Width should be positive!");
+  
+  if(params.shape == "TRI")
+  {
+    // do something
+  }
+}
+</pre>
+ 
+A complete example. Copy/paste it into the Playground at the top of this page to see how it works:
+<pre>
+function getParameterDefinitions() {
+  return [
+    {
+      name: 'width', 
+      type: 'float', 
+      initial: 10,
+      caption: "Width of the cube:", 
+    },
+    {
+      name: 'height', 
+      type: 'float', 
+      initial: 14,
+      caption: "Height of the cube:", 
+    },
+    {
+      name: 'depth', 
+      type: 'float', 
+      initial: 7,
+      caption: "Depth of the cube:", 
+    },
+    {
+      name: 'rounded', 
+      type: 'choice',
+      caption: 'Round the corners?',
+      values: [0, 1],
+      captions: ["No thanks", "Yes please"], 
+      initial: 1,
+    },
+  ];
+}
+
+function main(params) {
+  var result;
+  if(params.rounded == 1)
+  {
+    result = CSG.roundedCube({radius: [params.width, params.height, params.depth], roundradius: 2, resolution: 32});
+  }
+  else
+  {
+    result = CSG.cube({radius: [params.width, params.height, params.depth]});
+  }
+  return result;
+}
+</pre>
+Or see the <a href="gearsdemo.jscad">Gears demo</a> for another example of interactive parameters.
+
+<h2><a name="renderingmultipleobjects">Rendering multiple objects</a></h2>
+In particular when laser cutting or CNC machining, an artwork often consists of multiple objects that will be machined separately.
+Usually the model is designed as a whole, and then the partial objects are created from the complete model.
+To facilitate this it's possible to return multiple objects from the main() function. This avoids
+the need to render the jscad file multiple times to get the STL or DXF file for each part. Returning multiple objects 
+can be done simply by returning an array of CSG and/or CAG objects. Alternatively each object can be given a default file
+name and a caption by returning an object as follows:
+<pre>
+function main()
+{
+  var mycube = CSG.cube({radius: 10});
+  var mycircle = CAG.circle({radius: 10});
+
+  // we could just do:
+  // return [mycube, mycircle];
+
+  // give each element a description and filename:
+  return [
+    {
+      name: "cube",              // optional, will be used as a prefix for the downloaded stl file
+      caption: "A small cube",   // will be shown in the dropdown box
+      data: mycube,
+    },
+    {
+      name: "circle",            // optional, will be used as a prefix for the downloaded dxf file
+      caption: "Circle",
+      data: mycircle,
+    },
+  ];
+}
+</pre>
+If more than 1 object is returned, a dropdown box is displayed for selecting the part to be displayed and/or downloaded.
+The jscad is not re-rendered so switching between parts happens fast.
+<br><br>
+Of course it's still possible to return just a single CSG or CAG:
+<pre>
+function main()
+{
+  return CSG.cube({radius: 10});
+}
+</pre>
+
+
+<h2>Orthonormal basis</h2>
+An orthonormal basis can be used to convert 3D points to 2D points by projecting them onto a 3D plane.
+An orthonormal basis is constructed from a given plane. Optionally a 'right hand' vector can be given, this
+will become the x axis of the two dimensional plane. If no right hand vector is given, a random one is chosen.
+<br><br>
+CSG.OrthoNormalBasis.Z0Plane() creates an orthonormal basis for the z=0 plane. This transforms (xx,yy,zz) 3D coordinates
+into the 2D (xx, yy) coordinates, or vice versa from (xx, yy) into (xx, yy, 0).
+<br><br>
+CSG.OrthoNormalBasis.GetCartesian(axis1, axis2) creates an orthonormal basis for the standard XYZ planes.
+axis1 and axis 2 are one of ["X","Y","Z","-X","-Y","-Z"]. The orthonormal basis is constructed such that the 2D x coordinate 
+is mapped to the 3D axis specified by axis1, and the 2D y coordinate is mapped to the 3D axis specified by axis2.
+<br>
+For example: CSG.OrthoNormalBasis.GetCartesian("-Y","Z") will return an orthonormal basis where the 2D X axis maps to the 
+3D negated Y axis, and the 2D Y axis maps to the 3D Z axis.
+<br>
+CSG.OrthoNormalBasis.GetCartesian("X","Y") is the same as CSG.OrthoNormalBasis.Z0Plane()
+<br><br>
+Use to2D() and line3Dto2D() to convert from the 3D space to the 2D plane. Use to3D() and line2Dto3D()
+to convert the other way. 
+<br><br>
+getProjectionMatrix() gives the projection matrix to transform into the orthonormal basis. 
+getInverseProjectionMatrix() gives the matrix to transform back into the original basis.
+<pre>
+// construct a plane:
+var plane = CSG.Plane.fromNormalAndPoint([1,1,0], [0,0,1]);
+var orthobasis = new CSG.OrthoNormalBasis(plane);
+// or if we would like a specific right hand vector: 
+// var orthobasis = new CSG.OrthoNormalBasis(plane, [0,0,1]);
+
+var point3d = new CSG.Vector3D(1,5,7);
+var point2d = orthobasis.to2D(point3d);
+var projected = orthobasis.to3D(point2d);
+</pre>
+
+<h2>Getting features (volume and area)</h2>
+The volume and surface area of a solid can be calculated using getFeatures(). 
+For performance reasons, the function is designed such that it can calculate multiple features in a single pass.
+<pre>
+function main() {
+  var cube = CSG.cube({radius: 1});
+
+  // var volume = cube.getFeatures("volume");
+  // var area = cube.getFeatures("area");
+
+  var features = cube.getFeatures(["volume","area"]);
+  var volume = features[0];
+  var area = features[1];
+
+  OpenJsCad.log("volume: "+volume+"; area: "+area);   // volume: 8; area: 24 
+  return cube;
+}
+</pre>
+
+<h2>Miscellaneous</h2>
+Solids can be given a color using the setColor(r, g, b) function. Beware: this returns a new solid,
+the original solid is not modified! Faces of the solid will keep their original color when doing
+CSG operations (union() etc). Colors values range between 0.0 and 1.0 (not 255).  
+<pre>
+var cube1 = CSG.cube({radius: 10});
+cube1 = cube1.setColor(0.5, 0, 0);
+
+var cube2 = CSG.cube({radius: 10});
+cube2 = cube2.setColor(0, 0.5, 0);
+cube2 = cube2.translate([5,1,4]);
+
+var result = cube1.subtract(cube2);
+// the resulting solid will have faces with 2 different colors
+</pre>
+
+<h2><a name="math"></a>2D and 3D Math</h2>
+There are utility classes for many 2D and 3D operations. Below is a quick summary, for details
+view the source of csg.js:
+<pre>
+// --------- Vector3D ---------------------
+var vec1 = new CSG.Vector3D(1,2,3);       // 3 arguments
+var vec2 = new CSG.Vector3D( [1,2,3] );   // 1 array argument
+var vec3 = new CSG.Vector3D(vec2);        // cloning a vector
+// get the values as: vec1.x, vec.y, vec1.z
+// vector math. All operations return a new vector, the original is unmodified!
+// vectors cannot be modified. Instead you should create a new vector.
+vec.negated()
+vec.abs()
+vec.plus(othervector)
+vec.minus(othervector)
+vec.times(3.0)
+vec.dividedBy(-5)
+vec.dot(othervector)
+vec.lerp(othervector, t)  // linear interpolation (0 <= t <= 1)
+vec.length()
+vec.lengthSquared()       // == vec.length()^2
+vec.unit()
+vec.cross(othervector)    // cross product: returns a vector perpendicular to both
+vec.distanceTo(othervector)
+vec.distanceToSquared(othervector)  // == vec.distanceTo(othervector)^2
+vec.equals(othervector)
+vec.multiply4x4(matrix4x4)   // right multiply by a 4x4 matrix
+vec.min(othervector)        // returns a new vector with the minimum x,y and z values
+vec.max(othervector)        // returns a new vector with the maximum x,y and z values
+
+// --------- Vector2D ---------------------
+var vec1 = new CSG.Vector2D(1,2);       // 2 arguments
+var vec2 = new CSG.Vector2D( [1,2] );   // 1 array argument
+var vec3 = new CSG.Vector2D(vec2);      // cloning a vector
+// vector math. All operations return a new vector, the original is unmodified!
+vec.negated()
+vec.abs()
+vec.plus(othervector)
+vec.minus(othervector)
+vec.times(3.0)
+vec.dividedBy(-5)
+vec.dot(othervector)
+vec.lerp(othervector, t)  // linear interpolation (0 <= t <= 1)
+vec.length()
+vec.lengthSquared()       // == vec.length()^2
+vec.unit()
+vec.normal()              // returns a 90 degree clockwise rotated vector
+vec.distanceTo(othervector)
+vec.distanceToSquared(othervector)  // == vec.distanceTo(othervector)^2
+vec.cross(othervector)    // 2D cross product: returns a scalar
+vec.equals(othervector)
+vec.min(othervector)        // returns a new vector with the minimum x and y values
+vec.max(othervector)        // returns a new vector with the maximum x and y values
+vec.multiply4x4(matrix4x4)   // right multiply by a 4x4 matrix
+vec.toVector3D(z)         // convert to a vector3D by adding a z coordinate
+vec.angleDegrees()        // returns the angle of the vector: [1,0] = 0 degrees, [0, 1] = 90 degrees, etc
+vec.angleRadians()        // ditto in radians
+var vec = CSG.Vector2D.fromAngleDegrees(degrees);  // returns a vector at the specified angle
+var vec = CSG.Vector2D.fromAngleRadians(radians);  // returns a vector at the specified angle
+
+// --------- Matrix4x4 ---------------------
+var m1 = new CSG.Matrix4x4();          // unity matrix
+var m2 = new CSG.Matrix4x4( [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] );
+  // elements are passed in row order
+var result = m1.plus(m2); 
+var result = m1.minus(m2);
+var result = m1.multiply(m2);
+// matrix vector multiplication (vectors are padded with zeroes to get a 4x1 vector):
+var vec3d = m1.rightMultiply1x3Vector(vec3d);  // matrix * vector 
+var vec3d = m1.leftMultiply1x3Vector(vec3d);   // vector * matrix
+var vec2d = m1.rightMultiply1x2Vector(vec2d);  // matrix * vector 
+var vec2d = m1.leftMultiply1x2Vector(vec2d);   // vector * matrix
+// common transformation matrices:
+var m = CSG.Matrix4x4.rotationX(degrees);      // matrix for rotation about X axis
+var m = CSG.Matrix4x4.rotationY(degrees);      // matrix for rotation about Y axis
+var m = CSG.Matrix4x4.rotationZ(degrees);      // matrix for rotation about Z axis
+var m = CSG.Matrix4x4.rotation(rotationCenter, rotationAxis, degrees); // rotation about arbitrary point and axis
+var m = CSG.Matrix4x4.translation(vec3d);      // translation
+var m = CSG.Matrix4x4.scaling(vec3d);          // scale
+var m = CSG.Matrix4x4.mirroring(plane);        // mirroring in a plane; the argument must be a CSG.Plane
+// matrix transformations can be concatenated:
+var transform = CSG.Matrix4x4.rotationX(20).multiply(CSG.Matrix4x4.rotationY(30));
+// Use a CSG solid's transform() method to apply the transformation to a CSG solid
+
+// ------------ Plane --------------------------
+// a 3D plane is represented by a normal vector (should have unit length) and a distance from the origin w 
+// the plane passes through normal.times(w)
+var plane1 = new CSG.Plane(normal, w);         
+// Or we can construct a plane from 3 points:
+var plane2 = CSG.Plane.fromPoints(p1, p2, p3);
+// Or from a normal vector and 1 point:
+var plane3 = CSG.Plane.fromNormalAndPoint(normal, point);
+// Flip a plane (front side becomes back side):
+var plane4 = plane3.flipped();
+// Apply transformations (rotation, scaling, translation):
+var transformed = plane3.transformed(matrix4x4);  // argument is a CSG.Matrix4x4
+// Intersection of plane and 3d line:
+var point = plane3.intersectWithLine(line);        // argument is CSG.Line3D, returns a CSG.Vector3D
+// Intersection of 2 planes:
+var line = plane3.intersectWithPlane(plane);       // argument is another CSG.Plane, returns a CSG.Line3D
+// Distance to point:
+var w = signedDistanceToPoint(point);             // argument is CSG.Vector3D, returns a float (positive
+                                                  //    if in front of plane, negative if in back)
+
+// ------------ Line3D --------------------------
+// A line in 3d space is represented by a point and a direction vector.
+// Direction should be a unit vector. Point can be any point on the line:
+var line = new CSG.Line3D(point, direction);      // argumenst are CSG.Vector3D
+// or by giving two points:
+var line = CSG.Line3D.fromPoints(p1, p2);         // argumenst are CSG.Vector3D
+var point = intersectWithPlane(plane);            // == plane.intersectWithLine(this)
+var line2 = line.reverse();                       // same line but reverse direction
+var line2 = line.transform(matrix4x4);            // for rotation, scaling, etc
+var p = line.closestPointOnLine(point);           // project point onto the line
+var d = line.distanceToPoint(point);
+
+// ------------ Line2D --------------------------
+// A line in 2d space is represented by a normal vector and a distance w to the
+// origin along the normal vector
+// A line in 2d space is represented by a point and a direction vector.
+// Direction should be a unit vector. Point can be any point on the line:
+var line = new CSG.Line2D(CSG.Line2D(normal,w));
+// or by giving two points:
+var line = CSG.Line2D.fromPoints(p1, p2);         // argumenst are CSG.Vector2D
+var line2 = line.reverse();                       // same line but reverse direction
+var line2 = line.transform(matrix4x4);            // for rotation, scaling, etc
+var point = line.origin();                        // returns the point closest to the origin
+var dir = line.direction();                       // direction vector (CSG.Vector2D)
+var x = line.xAtY(y);                             // returns the x coordinate of the line at given y coordinate
+var d = absDistanceToPoint(point);                // returns the absolute distance between a point and the line
+var p = line.closestPoint(point);                 // projection of point onto the line
+var point = line.intersectWithLine(line2);        // intersection of two lines, returns CSG.Vector2D
+</pre>
+
+
+</body>
+</html>

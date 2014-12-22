@@ -31,31 +31,44 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
     var scene = new THREE.Scene();
     var renderer = new THREE.WebGLRenderer();
 
-    // LIGHT
-    var light = new THREE.PointLight(0xffffff);
-    light.position.set(45,45,45);
-    scene.add(light);
-
     //CAMERA
-    var threeJSCamera = new THREE.PerspectiveCamera();
-
+    var camera = new THREE.PerspectiveCamera();
+    console.log(options.color);
+    console.log(options.bgColor);
     options = options || {};
-    this.color = options.color || [0,0,1];
-    this.bgColor = options.bgColor || [0.93, 0.93, 0.93, 1];
+    this.colorValues = options.color || [0,0,1];
+    this.bgColorValues = options.bgColor || [0.93, 0.93, 0.93, 1];
+
+    /**
+     * Here, list of color values is being converted to THREE.Color's
+     * object. The last argument is passed to setClearColor method of
+     * renderer. This is the only way I can think of to convert this
+     * list into color objects.
+     */
+    this.color = new THREE.Color(this.colorValues[0], this.colorValues[1], this.colorValues[2]);
+    this.bgColor = new THREE.Color(this.bgColorValues[0], this.bgColorValues[1], this.bgColorValues[2]);
+    this.colorTransparency = this.bgColorValues[3];
     this.scene = scene;
     this.renderer = renderer;
-    this.threeJSCamera = threeJSCamera;
+    this.threeJSCamera = camera;
     this.light = light;
     this.angleX = -60;
     this.angleY = 0;
     this.angleZ = -45;
-    this.viewpointX = -100;
-    this.viewpointY = -70;
-    this.viewpointZ = initialdepth;
+    this.viewpointX = 50;
+    this.viewpointY = -50;
+    this.viewpointZ = 50;
 
-    scene.add(threeJSCamera);
-    threeJSCamera.position.set(this.viewpointX, this.viewpointY, this.viewpointZ);
-    threeJSCamera.lookAt(scene.position);
+    camera.position.set(this.viewpointX, this.viewpointY, this.viewpointZ);
+    camera.rotation.y = 180 * Math.PI / 180;
+    camera.lookAt(scene.position);
+
+    // LIGHTS
+    var light = new THREE.PointLight();
+    //offset to the camera
+    light.position.set(0, 0 , 0); //setting to 0 offset
+    camera.add(light);
+    scene.add(camera);
 
     // Draw axes flag:
     this.drawAxes = true;
@@ -69,18 +82,17 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
     renderer.domElement.width = width;
     renderer.domElement.height = height;
     renderer.setViewport(0, 0, width, height);
-    renderer.setClearColor( 0xfefefe, 1.0);
-
+    renderer.setClearColor(this.bgColor, this.colorTransparency);
     containerelement.appendChild(renderer.domElement);
-    var controls = new THREE.TrackballControls(threeJSCamera, renderer.domElement);
+    var controls = new THREE.TrackballControls(camera, renderer.domElement);
     this.controls = controls;
     var render = function () {
         try {
             requestAnimationFrame(render);
             controls.update();
-            renderer.render(scene, threeJSCamera);
+            renderer.render(scene, camera);
         } catch(error){
-            console.log("rendering error");
+            console.log("mesh is not ready or empty");
         }
     };
 
@@ -92,20 +104,27 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
 
         //Create axis (point1, point2, colour)
         function createAxis(p1, p2, color){
-            var line, lineGeometry = new THREE.Geometry(),
-                lineMat = new THREE.LineBasicMaterial({color: color, lineWidth: 1});
-            lineGeometry.vertices.push(p1, p2);
-            line = new THREE.Line(lineGeometry, lineMat);
-            scene.add(line);
+            var positiveLine, negativeLine,
+                positiveLineGeometry = new THREE.Geometry(),
+                negativeLineGeometry = new THREE.Geometry(),
+                positiveLineMat = new THREE.LineBasicMaterial({color: color, lineWidth: 1}),
+                negativeLineMat = new THREE.LineBasicMaterial({color: 0xD3D3D3, lineWidth: 1});
+            var origin = v(0 , 0 , 0);
+
+            positiveLineGeometry.vertices.push(origin , p2);
+            negativeLineGeometry.vertices.push(p1, origin);
+            positiveLine = new THREE.Line(positiveLineGeometry, positiveLineMat);
+            negativeLine = new THREE.Line(negativeLineGeometry, negativeLineMat);
+
+            scene.add(positiveLine);
+            scene.add(negativeLine);
         }
 
-        createAxis(v(-axisLength, 0, 0), v(axisLength, 0, 0), 0xFF0000);
-        createAxis(v(0, -axisLength, 0), v(0, axisLength, 0), 0x00FF00);
-        createAxis(v(0, 0, -axisLength), v(0, 0, axisLength), 0x0000FF);
+        createAxis(v(-axisLength, 0, 0), v(axisLength, 0, 0), 0xFF0000); //x axis
+        createAxis(v(0, -axisLength, 0), v(0, axisLength, 0), 0x00FF00); //y axis
+        createAxis(v(0, 0, -axisLength), v(0, 0, axisLength), 0x0000FF); //z axis
     };
-
-    debugaxis(2000);
-
+    this.createAxes = debugaxis;
     this.render = render;
     this.render();
     var _this=this;
@@ -122,68 +141,47 @@ OpenJsCad.Viewer.prototype = {
         // empty mesh list:
         this.meshes = [];
         this.onDraw();
+
+
+
     },
 
     supported: function() {
         return !!this.gl;
     },
 
-    ZOOM_MAX: 10000,
-    ZOOM_MIN: 10,
-    onZoomChanged: null,
-
-    setZoom: function(coeff) { //0...1
-        coeff=Math.max(coeff, 0);
-        coeff=Math.min(coeff, 1);
-        this.viewpointZ = this.ZOOM_MIN + coeff * (this.ZOOM_MAX - this.ZOOM_MIN);
-        if(this.onZoomChanged)
-        {
-            this.onZoomChanged();
-        }
-        this.onDraw();
-    },
-
-    getZoom: function() {
-        var coeff = (this.viewpointZ-this.ZOOM_MIN) / (this.ZOOM_MAX - this.ZOOM_MIN);
-        return coeff;
-    },
-
-    onMouseMove: function(e) {
-        if (e.dragging) {
-            e.preventDefault();
-            if(e.altKey) {
-                //ROTATE X, Y
-                this.angleY += e.deltaX * 2;
-                this.angleX += e.deltaY * 2;
-                //this.angleX = Math.max(-180, Math.min(180, this.angleX));
-            } else if(e.shiftKey) {//PAN
-                var factor = 5e-3;
-                this.viewpointX += factor * e.deltaX * this.viewpointZ;
-                this.viewpointY -= factor * e.deltaY * this.viewpointZ;
-            } else {
-                //ROTATE Z, X
-                this.angleZ += e.deltaX * 2;
-                this.angleX += e.deltaY * 2;
-            }
-            this.onDraw();
-        }
-    },
-
     onDraw: function(e) {
-        //console.log(this.meshes instanceof Array);
-        var material = new THREE.MeshNormalMaterial({color: 0x000080});
-        var pic = new THREE.Mesh(this.meshes, material);
+        //remove previous object from the scene first
+        this.scene.remove(this.pic);
+        var material;
+        material = new THREE.MeshPhongMaterial({color: this.color});
+        if(this.lineOverlay) {
+            material = new THREE.MeshPhongMaterial( { color: this.color, transparent: true, opacity: 0.4 })
+        }
+        if(this.drawLines) {
+            var wireframeMaterial =  new THREE.MeshBasicMaterial( { color: 0x000088, wireframe: true, side:THREE.DoubleSide } );
+            var wireframeObject = new THREE.Mesh(this.meshes, wireframeMaterial);
+            this.scene.add(wireframeObject);
+        }
+        material.shading = THREE.SmoothShading;
+        material.shininess = 100;
+
+        var object = new THREE.Mesh(this.meshes, material);
+        //used here for the reference in the next call
+        this.pic = object;
         this.controls.update();
         console.log(this.meshes);
-        this.scene.add(pic);
+        this.scene.add(object);
+
+        if(this.drawAxes){
+            this.createAxes(100);
+        }
+
         this.render();
     },
 
     buildAxes: function(length){
         var axes = new THREE.Object3D();
-
-
-
         this.scene.add(axes);
     }
 };
@@ -387,8 +385,8 @@ OpenJsCad.parseJsCadScriptSync = function(script, mainParameters, debugging) {
 // callback: should be function(error, csg)
 OpenJsCad.parseJsCadScriptASync = function(script, mainParameters, options, callback) {
     var baselibraries = [
-        "csg.js",
-        "openjscad.js"
+        "../src/csg.js",
+        "../src/openjscad.js"
     ];
 
     var baseurl = document.location.href.replace(/\?.*$/, '');
@@ -782,6 +780,7 @@ OpenJsCad.Processor.prototype = {
         }
         this.renderedElementDropdown.style.display = (obj.length >= 2)? "inline":"none";
         this.setSelectedObjectIndex( (obj.length > 0)? 0:-1);
+
     },
 
     setSelectedObjectIndex: function(index) {
@@ -1327,3 +1326,4 @@ OpenJsCad.Processor.prototype = {
         this.paramControls = paramControls;
     }
 };
+
