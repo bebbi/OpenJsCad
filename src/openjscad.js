@@ -1,6 +1,3 @@
-/**
- * Created by sahil on 12/20/14.
- */
 OpenJsCad = function() {
 };
 
@@ -29,15 +26,27 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
 
     //Threejs options;
     var scene = new THREE.Scene();
-    var renderer = new THREE.WebGLRenderer();
+    var renderer = new THREE.WebGLRenderer({precision: 'highp'});
 
     //CAMERA
-    var camera = new THREE.PerspectiveCamera();
-    console.log(options.color);
-    console.log(options.bgColor);
+    var camera = new THREE.PerspectiveCamera(45, width/height, 1, 10000);
     options = options || {};
-    this.colorValues = options.color || [0,0,1];
+    this.polygonColor = options.color || [0,0,1];
     this.bgColorValues = options.bgColor || [0.93, 0.93, 0.93, 1];
+
+    //should be uncommented to enable stats.js to see the fps info of the plotted surface.
+    //also in the render function.
+    //stats to track fps and other performance related variables
+    /*var stats = new Stats();
+    stats.setMode(0);
+    // align top-left
+    stats.domElement.style.position = 'absolute';
+    stats.domElement.style.left = '0px';
+    stats.domElement.width = '50px';
+    stats.domElement.height = '50px';
+    stats.domElement.style.top = '0px';
+    containerelement.appendChild( stats.domElement );
+*/
 
     /**
      * Here, list of color values is being converted to THREE.Color's
@@ -45,28 +54,33 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
      * renderer. This is the only way I can think of to convert this
      * list into color objects.
      */
-    this.color = new THREE.Color(this.colorValues[0], this.colorValues[1], this.colorValues[2]);
+    this.color = new THREE.Color(this.polygonColor[0], this.polygonColor[1], this.polygonColor[2]);
     this.bgColor = new THREE.Color(this.bgColorValues[0], this.bgColorValues[1], this.bgColorValues[2]);
     this.colorTransparency = this.bgColorValues[3];
     this.scene = scene;
     this.renderer = renderer;
-    this.threeJSCamera = camera;
+    this.camera = camera;
     this.light = light;
+    //this.stats = stats;
     this.angleX = -60;
     this.angleY = 0;
     this.angleZ = -45;
     this.viewpointX = 50;
     this.viewpointY = -50;
     this.viewpointZ = 50;
+    this.opacity = [];
 
     camera.position.set(this.viewpointX, this.viewpointY, this.viewpointZ);
-    camera.rotation.y = 180 * Math.PI / 180;
+    camera.rotation.x = 45 * Math.PI / 180;
     camera.lookAt(scene.position);
 
-    // LIGHTS
+    /**LIGHTS - There is a light at the origin and one is attached to the camera
+     * so that the view is always illuminated.
+     */
     var light = new THREE.PointLight();
     //offset to the camera
     light.position.set(0, 0 , 0); //setting to 0 offset
+    light.castShadow = false; //to increase performance
     camera.add(light);
     scene.add(camera);
 
@@ -76,26 +90,39 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
     this.drawLines = options.showLines || false;
     // Set to true so lines don't use the depth buffer
     this.lineOverlay = options.showLines || false;
-
-    renderer.domElement.style.width = displayW;
-    renderer.domElement.style.height = displayH;
-    renderer.domElement.width = width;
-    renderer.domElement.height = height;
-    renderer.setViewport(0, 0, width, height);
+    renderer.shadowMapEnabled = false; //to increase performance
+    renderer.domElement.id = "canvas";
+    renderer.setSize(width, height);
     renderer.setClearColor(this.bgColor, this.colorTransparency);
     containerelement.appendChild(renderer.domElement);
-    var controls = new THREE.TrackballControls(camera, renderer.domElement);
+    renderer.render( scene, camera );
+
+    var controls = new THREE.TrackballControl(camera, renderer.domElement);
     this.controls = controls;
+
+    //is called in a loop, which is around 60 times in a sec.
     var render = function () {
         try {
-            requestAnimationFrame(render);
+            //uncomment for stats.js
+            //stats.begin();
             controls.update();
             renderer.render(scene, camera);
+            //uncomment for stats.js
+            //stats.end();
+            //setting time out to limit fps to 60
+            setTimeout( function() {
+                requestAnimationFrame( render );
+            }, 1000 / 60 ); //this 60 is for 60fps reduce or increase it to change fps
+
         } catch(error){
-            console.log(error);
+            //console.log(error);
+            console.log("mesh is not ready or empty");
         }
     };
 
+
+    //axes are defined here, negative axes are grey and only the positive
+    //ones have colors.
     var debugaxis = function(axisLength){
         //Shorten the vertex function
         function v(x,y,z){
@@ -132,8 +159,28 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
 };
 
 OpenJsCad.Viewer.prototype = {
+    /**
+     * calls threecsg.js and converts CSG object to a Three.js's Mesh
+     * the returned value from THREE.CSG.fromCSG() is {mesh, array of opacity for each face
+     * @param csg
+     */
     setCsg: function(csg) {
-        this.meshes = THREE.CSG.fromCSG(csg);
+        //defining the zoom range from 0.1x to 10x
+        var bounds = csg.getBounds();
+        var max = 100; //minimum is 100
+        for(var indexY=0;indexY<2;indexY++){
+            for(var indexX=0;indexX<3;indexX++){
+                if(bounds[indexY][indexX] > max){
+                    max = bounds[indexY][indexX];
+                }
+            }
+        }
+        this.controls.maxDistance = 10*max; //10X
+        this.controls.minDistance = 0.1*max; //0.1X
+
+        var result = THREE.CSG.fromCSG(csg);
+        this.meshes = result[0];
+        this.opacity = result[1];
         this.onDraw();
     },
 
@@ -147,36 +194,173 @@ OpenJsCad.Viewer.prototype = {
         return !!this.gl;
     },
 
+    /**
+     * creates materials and adds them to the scene.
+     * There is an array of materials
+     * @param e
+     */
     onDraw: function(e) {
-        //remove previous object from the scene first
-        this.scene.remove(this.pic);
-        var material;
-        material = new THREE.MeshPhongMaterial({color: this.color});
-        if(this.lineOverlay) {
-            material = new THREE.MeshPhongMaterial( { color: this.color, transparent: true, opacity: 0.4 })
+        /**Custom Shader for better performance
+         * as they combine many objects into single Geometry
+         * and runs on GPU, saving computations.
+         * This is the main factor in improving performance.
+         * There are many variables which contains inline GLSL code
+         * and used for vertexShader and fragmentShader
+         */
+
+        /**TODO change the OpenGL code below to work as shader.
+         * The issue is that the meterial is also accessed in threecsg.js to set
+         * the face color and thus there is an array of materials created here to
+         * assign to each face, need to make that work
+         */
+
+        var wireframeVertexShader = '\
+            void main() {\
+                gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\
+            }';
+
+        var wireframeFragmentShader = '\
+            void main() {\
+                gl_FragColor = vec4(0.0, 0.0, 0.0, 0.1);\
+            }';
+
+        var materialVertexShader = '\
+            varying vec3 color;\
+            varying vec3 normal;\
+            varying vec3 light;\
+            void main() {\
+                const vec3 lightDir = vec3(1.0, 2.0, 3.0) / 3.741657386773941;\
+                light = lightDir;\
+                color = gl_Color.rgb;\
+                normal = gl_NormalMatrix * gl_Normal;\
+                gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\
+            }';
+
+        var materialFragmentShader = '\
+            varying vec3 color;\
+            varying vec3 normal;\
+            varying vec3 light;\
+            void main() {\
+                const vec3 lightDir = vec3(1.0, 2.0, 3.0) / 3.741657386773941;\
+                light = lightDir;\
+                color = gl_Color.rgb;\
+                normal = gl_NormalMatrix * gl_Normal;\
+                gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\
+            }';
+
+
+        var wireframeShader = new THREE.ShaderMaterial( {
+
+            uniforms: {
+                time: { type: "f", value: 1.0 },
+                resolution: { type: "v2", value: new THREE.Vector2() } },
+
+            attributes: {
+                vertexOpacity: { type: 'f', value: [] } },
+
+            vertexShader: wireframeVertexShader,
+
+            fragmentShader: wireframeFragmentShader
+
+        } );
+
+        var materialShader = new THREE.ShaderMaterial( {
+
+            uniforms: {
+                time: { type: "f", value: 1.0 },
+                resolution: { type: "v2", value: new THREE.Vector2() } },
+
+            attributes: {
+                vertexOpacity: { type: 'f', value: [] } },
+
+            vertexShader: materialVertexShader,
+
+            fragmentShader: materialFragmentShader
+
+        } );
+
+
+        try {
+            //remove previous object from the scene first
+            this.scene.remove(this.rendererObject);
+        } catch(error){
+            console.log("nothing to remove");
         }
-        if(this.drawLines) {
-            var wireframeMaterial =  new THREE.MeshBasicMaterial( { color: 0x000088, wireframe: true, side:THREE.DoubleSide } );
-            var wireframeObject = new THREE.Mesh(this.meshes, wireframeMaterial);
+        var opacity;
+        var materials = [];
+
+        this.wireframe = false;
+        //if opacity is not given and lineOverlay is true then add 0.5 opacity
+
+        //TODO implement shaders correctly and uncomment the commented lines below
+        for (var opa = 0; opa < this.opacity.length; opa++) {
+            if(this.opacity[opa][3] == 0){
+                this.wireframe = true;
+            }
+            if(this.lineOverlay){
+                if(this.opacity[opa] == 1){
+                    //default opacity for lineOverlay is 0.5
+                    this.opacity[opa] = 0.5;
+                }
+            }
+            //should be uncommented after implementing shaders properly
+/*            var materialShader = new THREE.ShaderMaterial( {
+                uniforms: {
+                    time: { type: "f", value: 1.0 },
+                    resolution: { type: "v2", value: new THREE.Vector2() } },
+                attributes: {
+                    vertexOpacity: { type: 'f', value: [] } },
+                vertexShader: materialVertexShader,
+                fragmentShader: materialFragmentShader,
+                wireframe: this.wireframe,
+                vertexColors: THREE.VertexColors
+            } );
+            materials.push(materialShader);
+             */
+            var phongMaterial = new THREE.MeshPhongMaterial({
+                opacity: this.opacity[opa],
+                wireframe: this.wireframe,
+                transparent: true,
+                vertexColors: THREE.VertexColors
+            });
+            materials.push(phongMaterial);
+
+        }
+        var object = new THREE.Mesh(this.meshes, new THREE.MeshFaceMaterial(materials));
+        //if drawLines is True then add wireframe to the entire mesh.
+        if(this.drawLines || this.lineOverlay) {
+            //this one also needs to be uncommented after implementing shaders.
+/*            var wireframeShader = new THREE.ShaderMaterial( {
+                uniforms: {
+                    time: { type: "f", value: 1.0 },
+                    resolution: { type: "v2", value: new THREE.Vector2() } },
+                attributes: {
+                    vertexOpacity: { type: 'f', value: [] } },
+                vertexShader: wireframeVertexShader,
+                fragmentShader: wireframeFragmentShader,
+                wireframe: true
+            } );
+             var wireframeObject = new THREE.Mesh(this.meshes, wireframeShader);
+            */
+            var phongWireframeMaterial = new THREE.MeshPhongMaterial({
+                wireframe: true,
+                transparent: true
+            });
+            var wireframeObject = new THREE.Mesh(this.meshes, phongWireframeMaterial);
             this.scene.add(wireframeObject);
         }
-        material.shading = THREE.SmoothShading;
-        material.shininess = 100;
-
-        var object = new THREE.Mesh(this.meshes, material);
-        //used here for the reference in the next call
-        this.pic = object;
+        //used here for the reference in the next call.
+        this.rendererObject = object;
         this.controls.update();
-        console.log(this.meshes);
         this.scene.add(object);
 
         if(this.drawAxes){
-            this.createAxes(100);
+            this.createAxes(1000);
         }
-
         this.render();
     },
 
+    //creates the access, is called only once.
     buildAxes: function(length){
         var axes = new THREE.Object3D();
         this.scene.add(axes);
@@ -382,8 +566,8 @@ OpenJsCad.parseJsCadScriptSync = function(script, mainParameters, debugging) {
 // callback: should be function(error, csg)
 OpenJsCad.parseJsCadScriptASync = function(script, mainParameters, options, callback) {
     var baselibraries = [
-        "csg.js",
-        "openjscad.js"
+        "src/csg.js",
+        "src/openjscad.js"
     ];
 
     var baseurl = document.location.href.replace(/\?.*$/, '');
@@ -564,8 +748,10 @@ OpenJsCad.Processor = function(containerdiv, options, onchange) {
 };
 
 OpenJsCad.Processor.convertToSolid = function(obj) {
+    //console.log(obj['polygons'][0]);
     if( (typeof(obj) == "object") && ((obj instanceof CAG)) )
     {
+
         // convert a 2D shape to a thin solid:
         obj=obj.extrude({offset: [0,0,0.1]});
     }
@@ -831,6 +1017,11 @@ OpenJsCad.Processor.prototype = {
     clearViewer: function() {
         this.clearOutputFile();
         this.setRenderedObjects(null);
+        try {
+            this.scene.remove(this.rendererObject);
+        } catch(error){
+            //this.scene is null. It is not set yet.
+        }
         this.hasValidCurrentObject = false;
         this.enableItems();
     },
@@ -1323,71 +1514,4 @@ OpenJsCad.Processor.prototype = {
         this.paramControls = paramControls;
     }
 };
-
-/**
- * @author alteredq / http://alteredqualia.com/
- * @author mr.doob / http://mrdoob.com/
- */
-
-var Detector = {
-
-    canvas: !! window.CanvasRenderingContext2D,
-    webgl: ( function () { try { var canvas = document.createElement( 'canvas' ); return !! ( window.WebGLRenderingContext && ( canvas.getContext( 'webgl' ) || canvas.getContext( 'experimental-webgl' ) ) ); } catch( e ) { return false; } } )(),
-    workers: !! window.Worker,
-    fileapi: window.File && window.FileReader && window.FileList && window.Blob,
-
-    getWebGLErrorMessage: function () {
-
-        var element = document.createElement( 'div' );
-        element.id = 'webgl-error-message';
-        element.style.fontFamily = 'monospace';
-        element.style.fontSize = '13px';
-        element.style.fontWeight = 'normal';
-        element.style.textAlign = 'center';
-        element.style.background = '#fff';
-        element.style.color = '#000';
-        element.style.padding = '1.5em';
-        element.style.width = '400px';
-        element.style.margin = '5em auto 0';
-
-        if ( ! this.webgl ) {
-
-            element.innerHTML = window.WebGLRenderingContext ? [
-                'Your graphics card does not seem to support <a href="http://khronos.org/webgl/wiki/Getting_a_WebGL_Implementation" style="color:#000">WebGL</a>.<br />',
-                'Find out how to get it <a href="http://get.webgl.org/" style="color:#000">here</a>.'
-            ].join( '\n' ) : [
-                'Your browser does not seem to support <a href="http://khronos.org/webgl/wiki/Getting_a_WebGL_Implementation" style="color:#000">WebGL</a>.<br/>',
-                'Find out how to get it <a href="http://get.webgl.org/" style="color:#000">here</a>.'
-            ].join( '\n' );
-
-        }
-
-        return element;
-
-    },
-
-    addGetWebGLMessage: function ( parameters ) {
-
-        var parent, id, element;
-
-        parameters = parameters || {};
-
-        parent = parameters.parent !== undefined ? parameters.parent : document.body;
-        id = parameters.id !== undefined ? parameters.id : 'oldie';
-
-        element = Detector.getWebGLErrorMessage();
-        element.id = id;
-
-        parent.appendChild( element );
-
-    }
-
-};
-
-// browserify support
-if ( typeof module === 'object' ) {
-
-    module.exports = Detector;
-
-}
 
