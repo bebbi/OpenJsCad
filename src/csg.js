@@ -195,6 +195,11 @@ for solid CAD anyway.
     };
 
     CSG.prototype = {
+
+        showWireframe: false,
+        showEdges: false,
+        color: [0,0,1,1],
+
         toPolygons: function() {
             return this.polygons;
         },
@@ -971,15 +976,36 @@ for solid CAD anyway.
                 return new CSG.Polygon(p.vertices, shared, p.plane);
             });
             var result = CSG.fromPolygons(polygons);
+
             result.properties = this.properties; // keep original properties
             result.isRetesselated = this.isRetesselated;
             result.isCanonicalized = this.isCanonicalized;
+            //console.log(result['polygons'][0].shared);
             return result;
         },
 
+        wireframe: function(bool){
+          this.showWireframe = bool;
+            var newWireFrameShared = new CSG.Polygon.Shared(this.color, bool, this.showEdges);
+            return this.setShared(newWireFrameShared);
+        },
+
+        edges: function(bool){
+            this.showEdges = bool;
+            var newEdgesShared = new CSG.Polygon.Shared(this.color, this.showWireframe, bool);
+            return this.setShared(newEdgesShared);
+        },
+
         setColor: function(red, green, blue, alpha) {
-            var newshared = new CSG.Polygon.Shared([red, green, blue, alpha || 1]);
+            this.color = [red, green, blue, alpha || 1];
+            var newshared = new CSG.Polygon.Shared(this.color, this.showWireframe, this.showEdges);
             return this.setShared(newshared);
+        },
+
+        setProperties: function(red, green, blue, alpha, wireframe, edges) {
+            //console.log(wireframe);
+            var newSharedProperties = new CSG.Polygon.Shared([red, green, blue, alpha || 1], wireframe, edges);
+            return this.setShared(newSharedProperties);
         },
 
         toCompactBinary: function() {
@@ -3145,12 +3171,15 @@ for solid CAD anyway.
 
     // # class CSG.Polygon.Shared
     // Holds the shared properties for each polygon (currently only color)
-    CSG.Polygon.Shared = function(color) {
+    CSG.Polygon.Shared = function(color, wireframe, edges) {
         this.color = color;
+        this.wireframe = wireframe;
+        //console.log(wireframe);
+        this.edges = edges;
     };
 
     CSG.Polygon.Shared.fromObject = function(obj) {
-        return new CSG.Polygon.Shared(obj.color);
+        return new CSG.Polygon.Shared(obj.color, obj.wireframe, obj.edges);
     };
 
     CSG.Polygon.Shared.prototype = {
@@ -3169,7 +3198,7 @@ for solid CAD anyway.
         }
     };
 
-    CSG.Polygon.defaultShared = new CSG.Polygon.Shared(null);
+    CSG.Polygon.defaultShared = new CSG.Polygon.Shared(null, false, false);
 
     // # class PolygonTreeNode
     // This class manages hierarchical splits of polygons
