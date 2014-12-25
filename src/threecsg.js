@@ -70,28 +70,59 @@ THREE.CSG = {
 		if ( !CSG ) {
 			throw 'CSG library not loaded. Please get a copy from https://github.com/evanw/csg.js';
 		}
-		
+		//setting 1 as the default value
+		var opacity = [1];
 		for ( i = 0; i < polygons.length; i++ ) {
-			
 			// Vertices
 			vertices = [];
+
 			for ( j = 0; j < polygons[i].vertices.length; j++ ) {
 				vertices.push( this.getGeometryVertex( three_geometry, polygons[i].vertices[j].pos ) );
 			}
+
 			if ( vertices[0] === vertices[vertices.length - 1] ) {
 				vertices.pop( );
 			}
-			
-			for (var j = 2; j < vertices.length; j++) {
-				face = new THREE.Face3( vertices[0], vertices[j-1], vertices[j], new THREE.Vector3( ).copy( polygons[i].plane.normal ) );
+
+			var polygonColor = polygons[i].shared.color;
+			//console.log(polygons[i].shared);
+			var faceOpacityIndex = 0;
+			if (polygonColor != null){
+				faceOpacityIndex = null;
+				for (var opacityIndex = 0; opacityIndex < opacity.length; opacityIndex++ ){
+					if(polygonColor[3] == opacity[opacityIndex]){
+						faceOpacityIndex = opacityIndex;
+					}
+				}
+				if(faceOpacityIndex == null){
+					if(polygonColor[3] < 1.0 && polygonColor[3] >= 0.0) {
+						opacity.push(polygonColor[3]);
+						faceOpacityIndex = opacity.length -1;
+					} else {
+						console.log("wrong transparency argument");
+						faceOpacityIndex = 0;
+					}
+				}
+			} else{
+				//default color is blue
+				polygonColor = [0,0,1];
+			}
+
+			for (var k = 2; k < vertices.length; k++) {
+				face = new THREE.Face3( vertices[0], vertices[k-1], vertices[k], new THREE.Vector3( ).copy( polygons[i].plane.normal), new THREE.Color(0,0,1), faceOpacityIndex );
+				face.color.setRGB(polygonColor[0], polygonColor[1], polygonColor[2]);
+				face.materialIndex = faceOpacityIndex;
 				three_geometry.faces.push( face );
-				//three_geometry.faceVertexUvs[0].push( new THREE.UV( ) );
 			}
 		}
-		
 		three_geometry.computeBoundingBox();
-		
-		return three_geometry;
+
+		this.opacity = opacity;
+		//this.opacity = [1, 1, 1];
+		var result = [];
+		result.push(three_geometry);
+		result.push(this.opacity);
+		return result;
 	},
 	
 	getGeometryVertex: function ( geometry, vertex_position ) {

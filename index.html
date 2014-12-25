@@ -2,11 +2,11 @@
 
 <html><head>
   <meta http-equiv="content-type" content="text/html; charset=utf-8">
-  <script src="../src/three.min.js"></script>
-  <script src="../src/csg.js"></script>
-  <script src="../src/trackballcontrols.js"></script>
-  <script src="../src/threecsg.js"></script>
-  <script src="../src/openjscad.js"></script>
+  <script src="src/three.min.js"></script>
+  <script src="src/csg.js"></script>
+  <script src="src/trackballcontrols.js"></script>
+  <script src="src/threecsg.js"></script>
+  <script src="src/openjscad.js"></script>
   <style>
 
 body {
@@ -39,10 +39,11 @@ textarea:focus {
   outline: none;
 }
 
-canvas { cursor: move; }
+
+canvas { cursor: move;}
 
     #examples {
-      border:1px solid black;
+      border:1px solid #f2f2f2;
       border-radius: 5px;   
     }
     
@@ -62,7 +63,7 @@ canvas { cursor: move; }
 
 
   </style>
-<link rel="stylesheet" href="css/openjscad.css" type="text/css">
+<link rel="stylesheet" href="openjscad.css" type="text/css">
 
 <script>
 
@@ -107,10 +108,9 @@ function updateSolid(id)
 <body onload="onload()">
   <h1>OpenJsCad</h1>
 Web based solid modeling in Javascript: user editable parametric models, STL and DXF export.
-<div id="viewer"></div><br>
   <h2>Examples</h2>
   <div id="examples">
-    <p id="example_info">Please select example to render</p>
+    <p id="example_info">You can also choose another example: </p>
     <select id="example_options">
       <option value="gears_code"> Gears </option>
       <option value="coupler_code"> Coupler </option>
@@ -121,7 +121,9 @@ Web based solid modeling in Javascript: user editable parametric models, STL and
       <option value="servo_code"> Servo </option>
     </select>
     <input id="render_example" type="submit" value="Update" onclick="updateSolid(document.getElementById('example_options').value); return false;">
-  </div>
+  </div><br>
+<div id="viewer"></div><br>
+
   <h2>Playground</h2>
 Try it by entering some code below. Anything you enter will be lost as soon as this page is reloaded;    
 to build your own models you should instead store them in a .jscad file on your computer 
@@ -657,7 +659,7 @@ function main(params)
     holder = holder.subtract(screwhole.translate([0, holdery1a-holderscrewholedistance, 0]));
     holder = holder.subtract(screwhole.translate([0, holdery2a+holderscrewholedistance, 0]));
 
-    holder = holder.setColor(0, 1, 0);
+    holder = holder.setColor(1, 1, 0);
 
     var holders = holder.translate([holderx,0,0]);
     holders = holders.union(holder.translate([-holderx,0,0]));
@@ -1645,7 +1647,7 @@ function servoMotor()
 
   // result: this is the solid in which we will store the servomotor
   var result = CSG.cube({radius:[width/2, length/2, h4/2]});
-
+  //result.setColor(0,1,0);
   // cutout: this is the solid for the cutout. It is never rendered directly,
   // but it will be returned as a property of the resulting solid.
   // it can be used to cutout the shape of the servo motor and screw holes
@@ -1689,12 +1691,14 @@ function servoMotor()
 
   // make the entire motor grey:
   result = result.setColor(0.2,0.2,0.2);
+    result.wireframe = true;
+    //result.edges(true;
 
   // create the shaft:
   p1 = new CSG.Vector3D([0, shafty, bottomz+h4]);
   p2 = p1.plus(new CSG.Vector3D([0, 0, cyl2height]));
   var shaft = CSG.cylinder({start: [0, shafty, bottomz+h4], end: [0, shafty, bottomz+shafttop], radius: shaftradius, resolution: resolution});
-  shaft = shaft.setColor(1,1,1);
+  shaft = shaft.setColor(0,0,1);
   result = result.union(shaft);
 
   // add the cutout solid to the properties:
@@ -1709,7 +1713,6 @@ function servoMotor()
     [0, 0, 1],             // axis
     [0, 1, 0]              // normal
   );
-
   return result;
 }
 </textarea><br>
@@ -1751,13 +1754,13 @@ Click and drag to rotate the model around the origin. Hold down Alt to change th
 Shift+Drag moves the model around. Zoom using the mouse wheel or using the slider below the model.
 <h2>Demos</h2>
 <ul>
-<li><a href="gearsdemo.jscad">Involute Gears</a></li>
-<li><a href="hookdemo.jscad">Parametric S hook</a>: shows how to extrude 2d paths</li>
-<li><a href="servodemo.jscad">Servo motor</a>: shows how to work with properties and connectors</li>
-<li><a href="grilledemo.jscad">Parametric Grille</a></li>
-<li><a href="couplerdemo.jscad">Parametric Axis Coupler</a></li>
-<li><a href="lampshadedemo.jscad">Parametric Lamp Shade</a>: creating 2D panels (for CNC / laser cutting) from a 3D design</li>
-<li><a href="ringdemo.jscad">Celtic Knot Ring</a></li>
+<li><a href="#" onclick="updateSolid('gears_code');">Involute Gears</a></li>
+<li><a href="#" onclick="updateSolid('hook_code');">Parametric S hook</a>: shows how to extrude 2d paths</li>
+<li><a href="#" onclick="updateSolid('servo_code');">Servo motor</a>: shows how to work with properties and connectors</li>
+<li><a href="#" onclick="updateSolid('grille_code');">Parametric Grille</a></li>
+<li><a href="#" onclick="updateSolid('coupler_code');">Parametric Axis Coupler</a></li>
+<li><a href="#" onclick="updateSolid('lampshade_code');">Parametric Lamp Shade</a>: creating 2D panels (for CNC / laser cutting) from a 3D design</li>
+<li><a href="#" onclick="updateSolid('ring_code');">Celtic Knot Ring</a></li>
 </ul>
 <h2>Tools, Libraries</h2>
 <ul>
@@ -1772,8 +1775,9 @@ and <a href="https://github.com/toaarnio">Tomi Aarnio</a> for WebGL rendering.
 Contributions by <a href="https://github.com/alx">Alexandre Girard</a>, 
 <a href="https://github.com/tlrobinson">Tom Robinson</a>,
  <a href="https://github.com/jboecker">jboecker</a>,
- <a href="https://github.com/risacher">risacher</a> and
- <a href="https://github.com/tedbeer">tedbeer</a>.
+ <a href="https://github.com/risacher">risacher</a>,
+ <a href="https://github.com/tedbeer">tedbeer</a> and
+  <a href="https://github.com/sahilshekhawat">Sahil Shekhawat</a>.
 All code released under MIT license.
 <br><br>
 Contributions are welcome! It's all written in Javascript, so if you know how to use it you
@@ -2017,7 +2021,7 @@ cube.properties.otherCorners = [
 cube.properties.myProperties = new CSG.Properties();
 cube.properties.myProperties.someProperty = new CSG.Vector3D([-1, -1, -1]);
 </pre>
-For an example see the <a href="servodemo.jscad">Servo motor</a> demo.
+For an example see the <a href="#" onclick="updateSolid('servo_code');">Servo motor</a> demo.
 
 <h2>Connectors</h2>
 The CSG.Connector class is intended to facilitate 
@@ -2087,7 +2091,7 @@ cube2 = cube2.transform(matrix);
 var result = cube2.union(cube1);
 
 </pre>
-For a more complete example see the <a href="servodemo.jscad">Servo motor</a> demo.
+For a more complete example see the <a href="#" onclick="updateSolid('servo_code');">Servo motor</a> demo.
 
 <h2>Determining the bounds of an object, lay object onto surface</h2>
 The getBounds() function can be used to retrieve the bounding box of an object.
@@ -2231,7 +2235,7 @@ var r4=r3.overCutInsideCorners(cutterradius);
 return r4;
 </pre>
 
-For an example of 2D shapes see the <a href="hookdemo.jscad">Parametric S hook</a> demo.
+For an example of 2D shapes see the <a href="#" onclick="updateSolid('hook_code');">Parametric S hook</a> demo.
 
 <h2>2D Paths</h2>
 A path is simply a series of points, connected by lines. A path can be open or closed (an additional line
@@ -2448,7 +2452,7 @@ function main(params) {
   return result;
 }
 </pre>
-Or see the <a href="gearsdemo.jscad">Gears demo</a> for another example of interactive parameters.
+Or see the <a href="#" onclick="updateSolid('gears_code');">Gears demo</a> for another example of interactive parameters.
 
 <h2><a name="renderingmultipleobjects">Rendering multiple objects</a></h2>
 In particular when laser cutting or CNC machining, an artwork often consists of multiple objects that will be machined separately.

@@ -11,7 +11,6 @@ THREE.TrackballControls = function ( object, domElement ) {
 	this.domElement = ( domElement !== undefined ) ? domElement : document;
 
 	// API
-
 	this.enabled = true;
 
 	this.screen = { width: 0, height: 0, offsetLeft: 0, offsetTop: 0 };
@@ -29,8 +28,8 @@ THREE.TrackballControls = function ( object, domElement ) {
 	this.staticMoving = false;
 	this.dynamicDampingFactor = 0.2;
 
-	this.minDistance = 0;
-	this.maxDistance = Infinity;
+	this.minDistance = 10;
+	this.maxDistance = 1000;
 
 	this.keys = [ 65 /*A*/, 83 /*S*/, 68 /*D*/ ];
 

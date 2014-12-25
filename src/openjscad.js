@@ -1,6 +1,3 @@
-/**
- * Created by sahil on 12/20/14.
- */
 OpenJsCad = function() {
 };
 
@@ -29,14 +26,12 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
 
     //Threejs options;
     var scene = new THREE.Scene();
-    var renderer = new THREE.WebGLRenderer();
+    var renderer = new THREE.WebGLRenderer({precision: 'highp'});
 
     //CAMERA
-    var camera = new THREE.PerspectiveCamera();
-    console.log(options.color);
-    console.log(options.bgColor);
+    var camera = new THREE.PerspectiveCamera(45, width/height, 1, 10000);
     options = options || {};
-    this.colorValues = options.color || [0,0,1];
+    this.polygonColor = options.color || [0,0,1];
     this.bgColorValues = options.bgColor || [0.93, 0.93, 0.93, 1];
 
     /**
@@ -45,12 +40,12 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
      * renderer. This is the only way I can think of to convert this
      * list into color objects.
      */
-    this.color = new THREE.Color(this.colorValues[0], this.colorValues[1], this.colorValues[2]);
+    this.color = new THREE.Color(this.polygonColor[0], this.polygonColor[1], this.polygonColor[2]);
     this.bgColor = new THREE.Color(this.bgColorValues[0], this.bgColorValues[1], this.bgColorValues[2]);
     this.colorTransparency = this.bgColorValues[3];
     this.scene = scene;
     this.renderer = renderer;
-    this.threeJSCamera = camera;
+    this.camera = camera;
     this.light = light;
     this.angleX = -60;
     this.angleY = 0;
@@ -59,8 +54,9 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
     this.viewpointY = -50;
     this.viewpointZ = 50;
 
+    this.opacity = [];
     camera.position.set(this.viewpointX, this.viewpointY, this.viewpointZ);
-    camera.rotation.y = 180 * Math.PI / 180;
+    camera.rotation.x = 45 * Math.PI / 180;
     camera.lookAt(scene.position);
 
     // LIGHTS
@@ -77,13 +73,26 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
     // Set to true so lines don't use the depth buffer
     this.lineOverlay = options.showLines || false;
 
-    renderer.domElement.style.width = displayW;
-    renderer.domElement.style.height = displayH;
-    renderer.domElement.width = width;
-    renderer.domElement.height = height;
-    renderer.setViewport(0, 0, width, height);
+    renderer.setSize(width, height);
+    renderer.domElement.id = "canvas";
     renderer.setClearColor(this.bgColor, this.colorTransparency);
     containerelement.appendChild(renderer.domElement);
+
+    window.addEventListener( 'resize', onWindowResize, false );
+    function onWindowResize(){
+
+        if(document.getElementById("canvas").width > window.innerWidth) {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        } else {
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+    }
+
+
     var controls = new THREE.TrackballControls(camera, renderer.domElement);
     this.controls = controls;
     var render = function () {
@@ -133,7 +142,9 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
 
 OpenJsCad.Viewer.prototype = {
     setCsg: function(csg) {
-        this.meshes = THREE.CSG.fromCSG(csg);
+        var result = THREE.CSG.fromCSG(csg);
+        this.meshes = result[0];
+        this.opacity = result[1];
         this.onDraw();
     },
 
@@ -141,9 +152,6 @@ OpenJsCad.Viewer.prototype = {
         // empty mesh list:
         this.meshes = [];
         this.onDraw();
-
-
-
     },
 
     supported: function() {
@@ -151,32 +159,33 @@ OpenJsCad.Viewer.prototype = {
     },
 
     onDraw: function(e) {
-        //remove previous object from the scene first
-        this.scene.remove(this.pic);
-        var material;
-        material = new THREE.MeshPhongMaterial({color: this.color});
-        if(this.lineOverlay) {
-            material = new THREE.MeshPhongMaterial( { color: this.color, transparent: true, opacity: 0.4 })
+        console.log(this.camera.position.z);
+        try {
+            //remove previous object from the scene first
+            this.scene.remove(this.pic);
+        } catch(error){
+            console.log("nothing to remove");
         }
-        if(this.drawLines) {
-            var wireframeMaterial =  new THREE.MeshBasicMaterial( { color: 0x000088, wireframe: true, side:THREE.DoubleSide } );
-            var wireframeObject = new THREE.Mesh(this.meshes, wireframeMaterial);
-            this.scene.add(wireframeObject);
-        }
-        material.shading = THREE.SmoothShading;
-        material.shininess = 100;
+        var materials = [];
+        var opacity;
 
-        var object = new THREE.Mesh(this.meshes, material);
-        //used here for the reference in the next call
+        for (var opa = 0; opa < this.opacity.length; opa++) {
+            var lambertMaterial = new THREE.MeshPhongMaterial({
+                opacity: this.opacity[opa],
+                transparent: true,
+                vertexColors: THREE.VertexColors
+            });
+            materials.push(lambertMaterial);
+        }
+        var object = new THREE.Mesh(this.meshes, new THREE.MeshFaceMaterial(materials));
+        //used here for the reference in the next call.
         this.pic = object;
         this.controls.update();
-        console.log(this.meshes);
         this.scene.add(object);
 
         if(this.drawAxes){
-            this.createAxes(100);
+            this.createAxes(1000);
         }
-
         this.render();
     },
 
@@ -385,8 +394,8 @@ OpenJsCad.parseJsCadScriptSync = function(script, mainParameters, debugging) {
 // callback: should be function(error, csg)
 OpenJsCad.parseJsCadScriptASync = function(script, mainParameters, options, callback) {
     var baselibraries = [
-        "../src/csg.js",
-        "../src/openjscad.js"
+        "src/csg.js",
+        "src/openjscad.js"
     ];
 
     var baseurl = document.location.href.replace(/\?.*$/, '');
@@ -567,8 +576,10 @@ OpenJsCad.Processor = function(containerdiv, options, onchange) {
 };
 
 OpenJsCad.Processor.convertToSolid = function(obj) {
+    //console.log(obj['polygons'][0]);
     if( (typeof(obj) == "object") && ((obj instanceof CAG)) )
     {
+
         // convert a 2D shape to a thin solid:
         obj=obj.extrude({offset: [0,0,0.1]});
     }
