@@ -72,29 +72,15 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
     this.drawLines = options.showLines || false;
     // Set to true so lines don't use the depth buffer
     this.lineOverlay = options.showLines || false;
-
-    renderer.setSize(width, height);
     renderer.domElement.id = "canvas";
+    renderer.setSize(width, height);
     renderer.setClearColor(this.bgColor, this.colorTransparency);
     containerelement.appendChild(renderer.domElement);
+    renderer.render( scene, camera );
 
-    window.addEventListener( 'resize', onWindowResize, false );
-    function onWindowResize(){
-
-        if(document.getElementById("canvas").width > window.innerWidth) {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        } else {
-            camera.aspect = width / height;
-            camera.updateProjectionMatrix();
-            renderer.setSize(width, height);
-        }
-    }
-
-
-    var controls = new THREE.TrackballControls(camera, renderer.domElement);
+    var controls = new THREE.TrackballControl(camera, renderer.domElement);
     this.controls = controls;
+
     var render = function () {
         try {
             requestAnimationFrame(render);
@@ -170,12 +156,12 @@ OpenJsCad.Viewer.prototype = {
         var opacity;
 
         for (var opa = 0; opa < this.opacity.length; opa++) {
-            var lambertMaterial = new THREE.MeshPhongMaterial({
+            var phongMaterial = new THREE.MeshPhongMaterial({
                 opacity: this.opacity[opa],
                 transparent: true,
                 vertexColors: THREE.VertexColors
             });
-            materials.push(lambertMaterial);
+            materials.push(phongMaterial);
         }
         var object = new THREE.Mesh(this.meshes, new THREE.MeshFaceMaterial(materials));
         //used here for the reference in the next call.

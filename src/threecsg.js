@@ -85,7 +85,6 @@ THREE.CSG = {
 			}
 
 			var polygonColor = polygons[i].shared.color;
-			//console.log(polygons[i].shared);
 			var faceOpacityIndex = 0;
 			if (polygonColor != null){
 				faceOpacityIndex = null;
@@ -95,7 +94,7 @@ THREE.CSG = {
 					}
 				}
 				if(faceOpacityIndex == null){
-					if(polygonColor[3] < 1.0 && polygonColor[3] >= 0.0) {
+					if(polygonColor[3] < 1) {
 						opacity.push(polygonColor[3]);
 						faceOpacityIndex = opacity.length -1;
 					} else {
@@ -104,9 +103,12 @@ THREE.CSG = {
 					}
 				}
 			} else{
+
 				//default color is blue
 				polygonColor = [0,0,1];
 			}
+
+
 
 			for (var k = 2; k < vertices.length; k++) {
 				face = new THREE.Face3( vertices[0], vertices[k-1], vertices[k], new THREE.Vector3( ).copy( polygons[i].plane.normal), new THREE.Color(0,0,1), faceOpacityIndex );
@@ -116,6 +118,8 @@ THREE.CSG = {
 			}
 		}
 		three_geometry.computeBoundingBox();
+
+
 
 		this.opacity = opacity;
 		//this.opacity = [1, 1, 1];
