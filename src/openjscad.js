@@ -148,16 +148,17 @@ OpenJsCad.Viewer.prototype = {
         console.log(this.camera.position.z);
         try {
             //remove previous object from the scene first
-            this.scene.remove(this.pic);
+            this.scene.remove(this.rendererObject);
         } catch(error){
             console.log("nothing to remove");
         }
-        var materials = [];
         var opacity;
+        var materials = [];
 
         for (var opa = 0; opa < this.opacity.length; opa++) {
             var phongMaterial = new THREE.MeshPhongMaterial({
-                opacity: this.opacity[opa],
+                opacity: this.opacity[opa][0],
+                wireframe: this.opacity[opa][1],
                 transparent: true,
                 vertexColors: THREE.VertexColors
             });
@@ -165,7 +166,7 @@ OpenJsCad.Viewer.prototype = {
         }
         var object = new THREE.Mesh(this.meshes, new THREE.MeshFaceMaterial(materials));
         //used here for the reference in the next call.
-        this.pic = object;
+        this.rendererObject = object;
         this.controls.update();
         this.scene.add(object);
 
@@ -831,6 +832,11 @@ OpenJsCad.Processor.prototype = {
     clearViewer: function() {
         this.clearOutputFile();
         this.setRenderedObjects(null);
+        try {
+            this.scene.remove(this.rendererObject);
+        } catch(error){
+            //this.scene is null. It is not set yet.
+        }
         this.hasValidCurrentObject = false;
         this.enableItems();
     },

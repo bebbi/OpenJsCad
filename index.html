@@ -236,12 +236,11 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
 
   // create the polygon and extrude into 3D:
   var rootcircle = new CSG.Polygon2D(points).extrude({offset: [0, 0, thickness]});
-
   var result = rootcircle.union(allteeth);
 
   // center at origin:
   result = result.translate([0, 0, -thickness/2]);
-
+  result = result.setProperties(0,1,0,1,true, false);
   return result;
 }
 </textarea>

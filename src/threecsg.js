@@ -70,8 +70,15 @@ THREE.CSG = {
 		if ( !CSG ) {
 			throw 'CSG library not loaded. Please get a copy from https://github.com/evanw/csg.js';
 		}
-		//setting 1 as the default value
-		var opacity = [1];
+		/**
+		 * setting 1 as the default opacity and
+		 * false as the wireframe's default value.
+		 * This below is the array which will be passed to openjscad
+		 * and contains an array of length 2 ,i.e. polygon opacity
+		 * and wireframe's value.
+		 */
+
+		var opacity = [[1, false, false]]; //[opacity, wireframe, edges]
 		for ( i = 0; i < polygons.length; i++ ) {
 			// Vertices
 			vertices = [];
@@ -85,17 +92,25 @@ THREE.CSG = {
 			}
 
 			var polygonColor = polygons[i].shared.color;
+			if(polygonColor != null) {
+				console.log(polygons[i].shared);
+				console.log(polygons[i].shared.wireframe);
+			}
 			var faceOpacityIndex = 0;
 			if (polygonColor != null){
 				faceOpacityIndex = null;
 				for (var opacityIndex = 0; opacityIndex < opacity.length; opacityIndex++ ){
-					if(polygonColor[3] == opacity[opacityIndex]){
-						faceOpacityIndex = opacityIndex;
+					if(polygonColor[3] == opacity[opacityIndex][0]){
+						if(opacity[opacityIndex][1] == polygons[i].shared.wireframe) {
+							if(opacity[opacityIndex][2] == polygons[i].shared.edges){
+								faceOpacityIndex = opacityIndex;
+							}
+						}
 					}
 				}
 				if(faceOpacityIndex == null){
-					if(polygonColor[3] < 1) {
-						opacity.push(polygonColor[3]);
+					if(polygonColor[3] <= 1) {
+						opacity.push([polygonColor[3], polygons[i].shared.wireframe]);
 						faceOpacityIndex = opacity.length -1;
 					} else {
 						console.log("wrong transparency argument");
@@ -108,8 +123,6 @@ THREE.CSG = {
 				polygonColor = [0,0,1];
 			}
 
-
-
 			for (var k = 2; k < vertices.length; k++) {
 				face = new THREE.Face3( vertices[0], vertices[k-1], vertices[k], new THREE.Vector3( ).copy( polygons[i].plane.normal), new THREE.Color(0,0,1), faceOpacityIndex );
 				face.color.setRGB(polygonColor[0], polygonColor[1], polygonColor[2]);
@@ -118,11 +131,9 @@ THREE.CSG = {
 			}
 		}
 		three_geometry.computeBoundingBox();
-
-
-
+		console.log("threecsg values");
+		console.log(opacity);
 		this.opacity = opacity;
-		//this.opacity = [1, 1, 1];
 		var result = [];
 		result.push(three_geometry);
 		result.push(this.opacity);
