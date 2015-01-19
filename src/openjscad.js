@@ -289,13 +289,13 @@ OpenJsCad.Viewer.prototype = {
         var opacity;
         var materials = [];
 
-        this.wireframe = false;
         //if opacity is not given and lineOverlay is true then add 0.5 opacity
-
         //TODO implement shaders correctly and uncomment the commented lines below
         for (var opa = 0; opa < this.opacity.length; opa++) {
-            if(this.opacity[opa][3] == 0){
+            this.wireframe = false;
+            if(this.opacity[opa] == 0){
                 this.wireframe = true;
+                this.opacity[opa] = 1;
             }
             if(this.lineOverlay){
                 if(this.opacity[opa] == 1){
