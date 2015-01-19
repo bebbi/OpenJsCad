@@ -61,24 +61,18 @@ THREE.CSG = {
 		
 		return CSG.fromPolygons( polygons );
 	},
-	
+	//This function is used to convert CSG objects to Three.js's  Mesh.
 	fromCSG: function( csg_model ) {
 		var i, j, vertices, face,
 			three_geometry = new THREE.Geometry( ),
 			polygons = csg_model.toPolygons( );
-		
+
 		if ( !CSG ) {
 			throw 'CSG library not loaded. Please get a copy from https://github.com/evanw/csg.js';
 		}
-		/**
-		 * setting 1 as the default opacity and
-		 * false as the wireframe's default value.
-		 * This below is the array which will be passed to openjscad
-		 * and contains an array of length 2 ,i.e. polygon opacity
-		 * and wireframe's value.
-		 */
 
-		var opacity = [[1, false, false]]; //[opacity, wireframe, edges]
+		//Default opacity for any face is 1 (opaque)
+		var opacity = [1];
 		for ( i = 0; i < polygons.length; i++ ) {
 			// Vertices
 			vertices = [];
@@ -90,27 +84,21 @@ THREE.CSG = {
 			if ( vertices[0] === vertices[vertices.length - 1] ) {
 				vertices.pop( );
 			}
-
+			//Shared value of the color from the csg.js, used to define color of face here
 			var polygonColor = polygons[i].shared.color;
-			if(polygonColor != null) {
-				console.log(polygons[i].shared);
-				console.log(polygons[i].shared.wireframe);
-			}
 			var faceOpacityIndex = 0;
 			if (polygonColor != null){
 				faceOpacityIndex = null;
+				//Checks if the said opacity is there already, if not then a new element is pushed in
+				//the opacity array and new index is assigned, if yes, then the previous index is assigned.
 				for (var opacityIndex = 0; opacityIndex < opacity.length; opacityIndex++ ){
-					if(polygonColor[3] == opacity[opacityIndex][0]){
-						if(opacity[opacityIndex][1] == polygons[i].shared.wireframe) {
-							if(opacity[opacityIndex][2] == polygons[i].shared.edges){
-								faceOpacityIndex = opacityIndex;
-							}
-						}
+					if(polygonColor[3] == opacity[opacityIndex]){
+						faceOpacityIndex = opacityIndex;
 					}
 				}
 				if(faceOpacityIndex == null){
 					if(polygonColor[3] <= 1) {
-						opacity.push([polygonColor[3], polygons[i].shared.wireframe]);
+						opacity.push(polygonColor[3]);
 						faceOpacityIndex = opacity.length -1;
 					} else {
 						console.log("wrong transparency argument");
@@ -118,11 +106,11 @@ THREE.CSG = {
 					}
 				}
 			} else{
-
 				//default color is blue
 				polygonColor = [0,0,1];
 			}
 
+			//defining faces here and setting their color along side.
 			for (var k = 2; k < vertices.length; k++) {
 				face = new THREE.Face3( vertices[0], vertices[k-1], vertices[k], new THREE.Vector3( ).copy( polygons[i].plane.normal), new THREE.Color(0,0,1), faceOpacityIndex );
 				face.color.setRGB(polygonColor[0], polygonColor[1], polygonColor[2]);
@@ -130,11 +118,11 @@ THREE.CSG = {
 				three_geometry.faces.push( face );
 			}
 		}
+		//created a bounded box geometry from the vertices.
 		three_geometry.computeBoundingBox();
-		console.log("threecsg values");
-		console.log(opacity);
 		this.opacity = opacity;
 		var result = [];
+		//result contains the mesh as well the opacity array.
 		result.push(three_geometry);
 		result.push(this.opacity);
 		return result;
@@ -142,12 +130,12 @@ THREE.CSG = {
 	
 	getGeometryVertex: function ( geometry, vertex_position ) {
 		var i;
+		// If Vertex already exists
+		//TODO improve this logic.
 		for ( i = 0; i < geometry.vertices.length; i++ ) {
-
 			if ( geometry.vertices[i].x === vertex_position.x &&
 				geometry.vertices[i].y === vertex_position.y &&
 				geometry.vertices[i].z === vertex_position.z ) {
-				// Vertex already exists
 				return i;
 			}
 		}

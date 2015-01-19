@@ -34,6 +34,20 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
     this.polygonColor = options.color || [0,0,1];
     this.bgColorValues = options.bgColor || [0.93, 0.93, 0.93, 1];
 
+    //should be uncommented to enable stats.js to see the fps info of the plotted surface.
+    //also in the render function.
+/*    //stats to track fps and other performance related variables
+    var stats = new Stats();
+    stats.setMode(0);
+    // align top-left
+    stats.domElement.style.position = 'absolute';
+    stats.domElement.style.left = '0px';
+    stats.domElement.width = '50px';
+    stats.domElement.height = '50px';
+    stats.domElement.style.top = '0px';
+    containerelement.appendChild( stats.domElement );*/
+
+
     /**
      * Here, list of color values is being converted to THREE.Color's
      * object. The last argument is passed to setClearColor method of
@@ -47,22 +61,26 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
     this.renderer = renderer;
     this.camera = camera;
     this.light = light;
+    //this.stats = stats;
     this.angleX = -60;
     this.angleY = 0;
     this.angleZ = -45;
     this.viewpointX = 50;
     this.viewpointY = -50;
     this.viewpointZ = 50;
-
     this.opacity = [];
+
     camera.position.set(this.viewpointX, this.viewpointY, this.viewpointZ);
     camera.rotation.x = 45 * Math.PI / 180;
     camera.lookAt(scene.position);
 
-    // LIGHTS
+    /**LIGHTS - There is a light at the origin and one is attached to the camera
+     * so that the view is always illuminated.
+     */
     var light = new THREE.PointLight();
     //offset to the camera
     light.position.set(0, 0 , 0); //setting to 0 offset
+    light.castShadow = false; //to increase performance
     camera.add(light);
     scene.add(camera);
 
@@ -72,6 +90,7 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
     this.drawLines = options.showLines || false;
     // Set to true so lines don't use the depth buffer
     this.lineOverlay = options.showLines || false;
+    renderer.shadowMapEnabled = false; //to increase performance
     renderer.domElement.id = "canvas";
     renderer.setSize(width, height);
     renderer.setClearColor(this.bgColor, this.colorTransparency);
@@ -81,16 +100,28 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
     var controls = new THREE.TrackballControl(camera, renderer.domElement);
     this.controls = controls;
 
+    //is called in a loop, which is around 60 times in a sec.
     var render = function () {
         try {
-            requestAnimationFrame(render);
+            //setting time out to limit fps to 60
+            setTimeout( function() {
+                requestAnimationFrame( render );
+            }, 1000 / 60 ); //this 60 is for 60fps reduce or increase it to change fps
+            //uncomment for stats.js
+            //stats.begin();
             controls.update();
             renderer.render(scene, camera);
+            //uncomment for stats.js
+            //stats.end();
         } catch(error){
+            //console.log(error);
             console.log("mesh is not ready or empty");
         }
     };
 
+
+    //axes are defined here, negative axes are grey and only the positive
+    //ones have colors.
     var debugaxis = function(axisLength){
         //Shorten the vertex function
         function v(x,y,z){
@@ -127,7 +158,25 @@ OpenJsCad.Viewer = function(containerelement, width, height, initialdepth, displ
 };
 
 OpenJsCad.Viewer.prototype = {
+    /**
+     * calls threecsg.js and converts CSG object to a Three.js's Mesh
+     * the returned value from THREE.CSG.fromCSG() is {mesh, array of opacity for each face
+     * @param csg
+     */
     setCsg: function(csg) {
+        //defining the zoom range from 0.1x to 10x
+        var bounds = csg.getBounds();
+        var max = 100; //minimum is 100
+        for(var indexY=0;indexY<2;indexY++){
+            for(var indexX=0;indexX<3;indexX++){
+                if(bounds[indexY][indexX] > max){
+                    max = bounds[indexY][indexX];
+                }
+            }
+        }
+        this.controls.maxDistance = 10*max; //10X
+        this.controls.minDistance = 0.1*max; //0.1X
+
         var result = THREE.CSG.fromCSG(csg);
         this.meshes = result[0];
         this.opacity = result[1];
@@ -144,8 +193,92 @@ OpenJsCad.Viewer.prototype = {
         return !!this.gl;
     },
 
+    /**
+     * creates materials and adds them to the scene.
+     * There is an array of materials
+     * @param e
+     */
     onDraw: function(e) {
-        console.log(this.camera.position.z);
+        /**Custom Shader for better performance
+         * as they combine many objects into single Geometry
+         * and runs on GPU, saving computations.
+         * This is the main factor in improving performance.
+         * There are many variables which contains inline GLSL code
+         * and used for vertexShader and fragmentShader
+         */
+
+        /**TODO change the OpenGL code below to work as shader.
+         * The issue is that the meterial is also accessed in threecsg.js to set
+         * the face color and thus there is an array of materials created here to
+         * assign to each face, need to make that work
+         */
+
+        var wireframeVertexShader = '\
+            void main() {\
+                gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\
+            }';
+
+        var wireframeFragmentShader = '\
+            void main() {\
+                gl_FragColor = vec4(0.0, 0.0, 0.0, 0.1);\
+            }';
+
+        var materialVertexShader = '\
+            varying vec3 color;\
+            varying vec3 normal;\
+            varying vec3 light;\
+            void main() {\
+                const vec3 lightDir = vec3(1.0, 2.0, 3.0) / 3.741657386773941;\
+                light = lightDir;\
+                color = gl_Color.rgb;\
+                normal = gl_NormalMatrix * gl_Normal;\
+                gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\
+            }';
+
+        var materialFragmentShader = '\
+            varying vec3 color;\
+            varying vec3 normal;\
+            varying vec3 light;\
+            void main() {\
+                const vec3 lightDir = vec3(1.0, 2.0, 3.0) / 3.741657386773941;\
+                light = lightDir;\
+                color = gl_Color.rgb;\
+                normal = gl_NormalMatrix * gl_Normal;\
+                gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\
+            }';
+
+
+        var wireframeShader = new THREE.ShaderMaterial( {
+
+            uniforms: {
+                time: { type: "f", value: 1.0 },
+                resolution: { type: "v2", value: new THREE.Vector2() } },
+
+            attributes: {
+                vertexOpacity: { type: 'f', value: [] } },
+
+            vertexShader: wireframeVertexShader,
+
+            fragmentShader: wireframeFragmentShader
+
+        } );
+
+        var materialShader = new THREE.ShaderMaterial( {
+
+            uniforms: {
+                time: { type: "f", value: 1.0 },
+                resolution: { type: "v2", value: new THREE.Vector2() } },
+
+            attributes: {
+                vertexOpacity: { type: 'f', value: [] } },
+
+            vertexShader: materialVertexShader,
+
+            fragmentShader: materialFragmentShader
+
+        } );
+
+
         try {
             //remove previous object from the scene first
             this.scene.remove(this.rendererObject);
@@ -155,16 +288,66 @@ OpenJsCad.Viewer.prototype = {
         var opacity;
         var materials = [];
 
+        this.wireframe = false;
+        //if opacity is not given and lineOverlay is true then add 0.5 opacity
+
+        //TODO implement shaders correctly and uncomment the commented lines below
         for (var opa = 0; opa < this.opacity.length; opa++) {
+            if(this.opacity[opa][3] == 0){
+                this.wireframe = true;
+            }
+            if(this.lineOverlay){
+                if(this.opacity[opa] == 1){
+                    //default opacity for lineOverlay is 0.5
+                    this.opacity[opa] = 0.5;
+                }
+            }
+            //should be uncommented after implementing shaders properly
+/*            var materialShader = new THREE.ShaderMaterial( {
+                uniforms: {
+                    time: { type: "f", value: 1.0 },
+                    resolution: { type: "v2", value: new THREE.Vector2() } },
+                attributes: {
+                    vertexOpacity: { type: 'f', value: [] } },
+                vertexShader: materialVertexShader,
+                fragmentShader: materialFragmentShader,
+                wireframe: this.wireframe,
+                vertexColors: THREE.VertexColors
+            } );
+            materials.push(materialShader);
+             */
             var phongMaterial = new THREE.MeshPhongMaterial({
-                opacity: this.opacity[opa][0],
-                wireframe: this.opacity[opa][1],
+                opacity: this.opacity[opa],
+                wireframe: this.wireframe,
                 transparent: true,
                 vertexColors: THREE.VertexColors
             });
             materials.push(phongMaterial);
+
         }
         var object = new THREE.Mesh(this.meshes, new THREE.MeshFaceMaterial(materials));
+        //if drawLines is True then add wireframe to the entire mesh.
+        if(this.drawLines || this.lineOverlay) {
+            //this one also needs to be uncommented after implementing shaders.
+/*            var wireframeShader = new THREE.ShaderMaterial( {
+                uniforms: {
+                    time: { type: "f", value: 1.0 },
+                    resolution: { type: "v2", value: new THREE.Vector2() } },
+                attributes: {
+                    vertexOpacity: { type: 'f', value: [] } },
+                vertexShader: wireframeVertexShader,
+                fragmentShader: wireframeFragmentShader,
+                wireframe: true
+            } );
+             var wireframeObject = new THREE.Mesh(this.meshes, wireframeShader);
+            */
+            var phongWireframeMaterial = new THREE.MeshPhongMaterial({
+                wireframe: true,
+                transparent: true
+            });
+            var wireframeObject = new THREE.Mesh(this.meshes, phongWireframeMaterial);
+            this.scene.add(wireframeObject);
+        }
         //used here for the reference in the next call.
         this.rendererObject = object;
         this.controls.update();
@@ -176,6 +359,7 @@ OpenJsCad.Viewer.prototype = {
         this.render();
     },
 
+    //creates the access, is called only once.
     buildAxes: function(length){
         var axes = new THREE.Object3D();
         this.scene.add(axes);

@@ -4,6 +4,7 @@
   <meta http-equiv="content-type" content="text/html; charset=utf-8">
   <script src="src/three.min.js"></script>
   <script src="src/csg.js"></script>
+  <script src="src/stats.min.js"></script>
   <script src="src/trackballcontrols.js"></script>
   <script src="src/threecsg.js"></script>
   <script src="src/openjscad.js"></script>
@@ -240,7 +241,6 @@ function involuteGear(numTeeth, circularPitch, pressureAngle, clearance, thickne
 
   // center at origin:
   result = result.translate([0, 0, -thickness/2]);
-  result = result.setProperties(0,1,0,1,true, false);
   return result;
 }
 </textarea>

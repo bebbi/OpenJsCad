@@ -1,86 +1,86 @@
 /*
-## License
+ ## License
 
-Copyright (c) 2014 bebbi (elghatta@gmail.com)
-Copyright (c) 2013 Eduard Bespalov (edwbes@gmail.com)
-Copyright (c) 2012 Joost Nieuwenhuijse (joost@newhouse.nl)
-Copyright (c) 2011 Evan Wallace (http://evanw.github.com/csg.js/)
-Copyright (c) 2012 Alexandre Girard (https://github.com/alx)
+ Copyright (c) 2014 bebbi (elghatta@gmail.com)
+ Copyright (c) 2013 Eduard Bespalov (edwbes@gmail.com)
+ Copyright (c) 2012 Joost Nieuwenhuijse (joost@newhouse.nl)
+ Copyright (c) 2011 Evan Wallace (http://evanw.github.com/csg.js/)
+ Copyright (c) 2012 Alexandre Girard (https://github.com/alx)
 
-All code released under MIT license
+ All code released under MIT license
 
-## Overview
+ ## Overview
 
-For an overview of the CSG process see the original csg.js code:
-http://evanw.github.com/csg.js/
+ For an overview of the CSG process see the original csg.js code:
+ http://evanw.github.com/csg.js/
 
-CSG operations through BSP trees suffer from one problem: heavy fragmentation
-of polygons. If two CSG solids of n polygons are unified, the resulting solid may have
-in the order of n*n polygons, because each polygon is split by the planes of all other
-polygons. After a few operations the number of polygons explodes.
+ CSG operations through BSP trees suffer from one problem: heavy fragmentation
+ of polygons. If two CSG solids of n polygons are unified, the resulting solid may have
+ in the order of n*n polygons, because each polygon is split by the planes of all other
+ polygons. After a few operations the number of polygons explodes.
 
-This version of CSG.js solves the problem in 3 ways:
+ This version of CSG.js solves the problem in 3 ways:
 
-1. Every polygon split is recorded in a tree (CSG.PolygonTreeNode). This is a separate
-tree, not to be confused with the CSG tree. If a polygon is split into two parts but in
-the end both fragments have not been discarded by the CSG operation, we can retrieve
-the original unsplit polygon from the tree, instead of the two fragments.
+ 1. Every polygon split is recorded in a tree (CSG.PolygonTreeNode). This is a separate
+ tree, not to be confused with the CSG tree. If a polygon is split into two parts but in
+ the end both fragments have not been discarded by the CSG operation, we can retrieve
+ the original unsplit polygon from the tree, instead of the two fragments.
 
-This does not completely solve the issue though: if a polygon is split multiple times
-the number of fragments depends on the order of subsequent splits, and we might still
-end up with unncessary splits:
-Suppose a polygon is first split into A and B, and then into A1, B1, A2, B2. Suppose B2 is
-discarded. We will end up with 2 polygons: A and B1. Depending on the actual split boundaries
-we could still have joined A and B1 into one polygon. Therefore a second approach is used as well:
+ This does not completely solve the issue though: if a polygon is split multiple times
+ the number of fragments depends on the order of subsequent splits, and we might still
+ end up with unncessary splits:
+ Suppose a polygon is first split into A and B, and then into A1, B1, A2, B2. Suppose B2 is
+ discarded. We will end up with 2 polygons: A and B1. Depending on the actual split boundaries
+ we could still have joined A and B1 into one polygon. Therefore a second approach is used as well:
 
-2. After CSG operations all coplanar polygon fragments are joined by a retesselating
-operation. See CSG.reTesselated(). Retesselation is done through a
-linear sweep over the polygon surface. The sweep line passes over the y coordinates
-of all vertices in the polygon. Polygons are split at each sweep line, and the fragments
-are joined horizontally and vertically into larger polygons (making sure that we
-will end up with convex polygons).
-This still doesn't solve the problem completely: due to floating point imprecisions
-we may end up with small gaps between polygons, and polygons may not be exactly coplanar
-anymore, and as a result the retesselation algorithm may fail to join those polygons.
-Therefore:
+ 2. After CSG operations all coplanar polygon fragments are joined by a retesselating
+ operation. See CSG.reTesselated(). Retesselation is done through a
+ linear sweep over the polygon surface. The sweep line passes over the y coordinates
+ of all vertices in the polygon. Polygons are split at each sweep line, and the fragments
+ are joined horizontally and vertically into larger polygons (making sure that we
+ will end up with convex polygons).
+ This still doesn't solve the problem completely: due to floating point imprecisions
+ we may end up with small gaps between polygons, and polygons may not be exactly coplanar
+ anymore, and as a result the retesselation algorithm may fail to join those polygons.
+ Therefore:
 
-3. A canonicalization algorithm is implemented: it looks for vertices that have
-approximately the same coordinates (with a certain tolerance, say 1e-5) and replaces
-them with the same vertex. If polygons share a vertex they will actually point to the
-same CSG.Vertex instance. The same is done for polygon planes. See CSG.canonicalized().
-
-
-Performance improvements to the original CSG.js:
-
-Replaced the flip() and invert() methods by flipped() and inverted() which don't
-modify the source object. This allows to get rid of all clone() calls, so that
-multiple polygons can refer to the same CSG.Plane instance etc.
-
-The original union() used an extra invert(), clipTo(), invert() sequence just to remove the
-coplanar front faces from b; this is now combined in a single b.clipTo(a, true) call.
-
-Detection whether a polygon is in front or in back of a plane: for each polygon
-we are caching the coordinates of the bounding sphere. If the bounding sphere is
-in front or in back of the plane we don't have to check the individual vertices
-anymore.
+ 3. A canonicalization algorithm is implemented: it looks for vertices that have
+ approximately the same coordinates (with a certain tolerance, say 1e-5) and replaces
+ them with the same vertex. If polygons share a vertex they will actually point to the
+ same CSG.Vertex instance. The same is done for polygon planes. See CSG.canonicalized().
 
 
-Other additions to the original CSG.js:
+ Performance improvements to the original CSG.js:
 
-CSG.Vector class has been renamed into CSG.Vector3D
+ Replaced the flip() and invert() methods by flipped() and inverted() which don't
+ modify the source object. This allows to get rid of all clone() calls, so that
+ multiple polygons can refer to the same CSG.Plane instance etc.
 
-Classes for 3D lines, 2D vectors, 2D lines, and methods to find the intersection of
-a line and a plane etc.
+ The original union() used an extra invert(), clipTo(), invert() sequence just to remove the
+ coplanar front faces from b; this is now combined in a single b.clipTo(a, true) call.
 
-Transformations: CSG.transform(), CSG.translate(), CSG.rotate(), CSG.scale()
+ Detection whether a polygon is in front or in back of a plane: for each polygon
+ we are caching the coordinates of the bounding sphere. If the bounding sphere is
+ in front or in back of the plane we don't have to check the individual vertices
+ anymore.
 
-Expanding or contracting a solid: CSG.expand() and CSG.contract(). Creates nice
-smooth corners.
 
-The vertex normal has been removed since it complicates retesselation. It's not needed
-for solid CAD anyway.
+ Other additions to the original CSG.js:
 
-*/
+ CSG.Vector class has been renamed into CSG.Vector3D
+
+ Classes for 3D lines, 2D vectors, 2D lines, and methods to find the intersection of
+ a line and a plane etc.
+
+ Transformations: CSG.transform(), CSG.translate(), CSG.rotate(), CSG.scale()
+
+ Expanding or contracting a solid: CSG.expand() and CSG.contract(). Creates nice
+ smooth corners.
+
+ The vertex normal has been removed since it complicates retesselation. It's not needed
+ for solid CAD anyway.
+
+ */
 
 (function(module) {
 
@@ -195,11 +195,6 @@ for solid CAD anyway.
     };
 
     CSG.prototype = {
-
-        showWireframe: false,
-        showEdges: false,
-        color: [0,0,1,1],
-
         toPolygons: function() {
             return this.polygons;
         },
@@ -428,9 +423,9 @@ for solid CAD anyway.
             // value: an array of strings specifying polygons of this color
             //        (as space-separated indices into vertexCoords)
             var materialPolygonLists = {},
-                // list of coordinates (as "x y z" strings)
+            // list of coordinates (as "x y z" strings)
                 vertexCoords = [],
-                // map to look up the index in vertexCoords of a given vertex
+            // map to look up the index in vertexCoords of a given vertex
                 vertexTagToCoordIndexMap = {};
 
             this.polygons.map(function(p) {
@@ -487,13 +482,13 @@ for solid CAD anyway.
             exportRoot.appendChild(exportScene);
 
             /*
-                For each color, create a shape made of an appropriately colored
-                material which contains all polygons that are this color.
+             For each color, create a shape made of an appropriately colored
+             material which contains all polygons that are this color.
 
-                The first shape will contain the definition of all vertices,
-                (<Coordinate DEF="coords_mesh"/>), which will be referenced by
-                subsequent shapes.
-              */
+             The first shape will contain the definition of all vertices,
+             (<Coordinate DEF="coords_mesh"/>), which will be referenced by
+             subsequent shapes.
+             */
             var coordsMeshDefined = false;
             for (var colorString in materialPolygonLists) {
                 var polygonList = materialPolygonLists[colorString];
@@ -690,12 +685,12 @@ for solid CAD anyway.
                 var vertexpair = vertexpairs[vertextagpair],
                     startpoint = vertexpair.v1.pos,
                     endpoint = vertexpair.v2.pos,
-                    // our x,y and z vectors:
+                // our x,y and z vectors:
                     zbase = endpoint.minus(startpoint).unit(),
                     xbase = vertexpair.planenormals[0].unit(),
                     ybase = xbase.cross(zbase),
 
-                    // make a list of angles that the cylinder should traverse:
+                // make a list of angles that the cylinder should traverse:
                     angles = [];
 
                 // first of all equally spaced around the cylinder:
@@ -976,36 +971,15 @@ for solid CAD anyway.
                 return new CSG.Polygon(p.vertices, shared, p.plane);
             });
             var result = CSG.fromPolygons(polygons);
-
             result.properties = this.properties; // keep original properties
             result.isRetesselated = this.isRetesselated;
             result.isCanonicalized = this.isCanonicalized;
-            //console.log(result['polygons'][0].shared);
             return result;
         },
 
-        wireframe: function(bool){
-          this.showWireframe = bool;
-            var newWireFrameShared = new CSG.Polygon.Shared(this.color, bool, this.showEdges);
-            return this.setShared(newWireFrameShared);
-        },
-
-        edges: function(bool){
-            this.showEdges = bool;
-            var newEdgesShared = new CSG.Polygon.Shared(this.color, this.showWireframe, bool);
-            return this.setShared(newEdgesShared);
-        },
-
         setColor: function(red, green, blue, alpha) {
-            this.color = [red, green, blue, alpha || 1];
-            var newshared = new CSG.Polygon.Shared(this.color, this.showWireframe, this.showEdges);
+            var newshared = new CSG.Polygon.Shared([red, green, blue, alpha || 1]);
             return this.setShared(newshared);
-        },
-
-        setProperties: function(red, green, blue, alpha, wireframe, edges) {
-            //console.log(wireframe);
-            var newSharedProperties = new CSG.Polygon.Shared([red, green, blue, alpha || 1], wireframe, edges);
-            return this.setShared(newSharedProperties);
         },
 
         toCompactBinary: function() {
@@ -1246,11 +1220,11 @@ for solid CAD anyway.
 
          Suppose we have two polygons ACDB and EDGF:
 
-          A-----B
-          |     |
-          |     E--F
-          |     |  |
-          C-----D--G
+         A-----B
+         |     |
+         |     E--F
+         |     |  |
+         C-----D--G
 
          Note that vertex E forms a T-junction on the side BD. In this case some STL slicers will complain
          that the solid is not watertight. This is because the watertightness check is done by checking if
@@ -1549,8 +1523,8 @@ for solid CAD anyway.
                 features = [features];
             }
             var result = this.toTriangles().map(function(triPoly) {
-                    return triPoly.getTetraFeatures(features);
-                })
+                return triPoly.getTetraFeatures(features);
+            })
                 .reduce(function(pv, v) {
                     return v.map(function(feat, i) {
                         return feat + (pv === 0 ? 0 : pv[i]);
@@ -1679,15 +1653,15 @@ for solid CAD anyway.
                 [0, 0, +1]
             ]
         ].map(function(info) {
-            //var normal = new CSG.Vector3D(info[1]);
-            //var plane = new CSG.Plane(normal, 1);
-            var vertices = info[0].map(function(i) {
-                var pos = new CSG.Vector3D(
-                    c.x + r.x * (2 * !!(i & 1) - 1), c.y + r.y * (2 * !!(i & 2) - 1), c.z + r.z * (2 * !!(i & 4) - 1));
-                return new CSG.Vertex(pos);
-            });
-            return new CSG.Polygon(vertices, null /* , plane */ );
-        }));
+                //var normal = new CSG.Vector3D(info[1]);
+                //var plane = new CSG.Plane(normal, 1);
+                var vertices = info[0].map(function(i) {
+                    var pos = new CSG.Vector3D(
+                        c.x + r.x * (2 * !!(i & 1) - 1), c.y + r.y * (2 * !!(i & 2) - 1), c.z + r.z * (2 * !!(i & 4) - 1));
+                    return new CSG.Vertex(pos);
+                });
+                return new CSG.Polygon(vertices, null /* , plane */ );
+            }));
         result.properties.cube = new CSG.Properties();
         result.properties.cube.center = new CSG.Vector3D(c);
         // add 6 connectors, at the centers of each face:
@@ -2126,23 +2100,23 @@ for solid CAD anyway.
             throw new Error("polyhedron needs 'points' and 'faces' arrays");
         }
         var vertices = CSG.parseOptionAs3DVectorList(options, "points", [
-                [1, 1, 0],
-                [1, -1, 0],
-                [-1, -1, 0],
-                [-1, 1, 0],
-                [0, 0, 1]
-            ])
+            [1, 1, 0],
+            [1, -1, 0],
+            [-1, -1, 0],
+            [-1, 1, 0],
+            [0, 0, 1]
+        ])
             .map(function(pt) {
                 return new CSG.Vertex(pt);
             });
         var faces = CSG.parseOption(options, "faces", [
-                [0, 1, 4],
-                [1, 2, 4],
-                [2, 3, 4],
-                [3, 0, 4],
-                [1, 0, 3],
-                [2, 1, 3]
-            ])
+            [0, 1, 4],
+            [1, 2, 4],
+            [2, 3, 4],
+            [3, 0, 4],
+            [1, 0, 3],
+            [2, 1, 3]
+        ])
             // openscad convention defines inward normals - so we have to invert here
             .map(function(face) {
                 return [face[1], face[0], face[2]];
@@ -2754,7 +2728,7 @@ for solid CAD anyway.
         // NOTE: _getArea only works on triangle polygons!
         _getArea: function() {
             return this.vertices[1].pos.minus(this.vertices[0].pos)
-                .cross(this.vertices[2].pos.minus(this.vertices[1].pos)).length() / 2;
+                    .cross(this.vertices[2].pos.minus(this.vertices[1].pos)).length() / 2;
         },
 
 
@@ -3171,15 +3145,12 @@ for solid CAD anyway.
 
     // # class CSG.Polygon.Shared
     // Holds the shared properties for each polygon (currently only color)
-    CSG.Polygon.Shared = function(color, wireframe, edges) {
+    CSG.Polygon.Shared = function(color) {
         this.color = color;
-        this.wireframe = wireframe;
-        //console.log(wireframe);
-        this.edges = edges;
     };
 
     CSG.Polygon.Shared.fromObject = function(obj) {
-        return new CSG.Polygon.Shared(obj.color, obj.wireframe, obj.edges);
+        return new CSG.Polygon.Shared(obj.color);
     };
 
     CSG.Polygon.Shared.prototype = {
@@ -3198,7 +3169,7 @@ for solid CAD anyway.
         }
     };
 
-    CSG.Polygon.defaultShared = new CSG.Polygon.Shared(null, false, false);
+    CSG.Polygon.defaultShared = new CSG.Polygon.Shared(null);
 
     // # class PolygonTreeNode
     // This class manages hierarchical splits of polygons
@@ -3502,26 +3473,26 @@ for solid CAD anyway.
             if (!this.plane) {
                 var bestplane = polygontreenodes[0].getPolygon().plane;
                 /*
-      var parentnormals = [];
-      this.getParentPlaneNormals(parentnormals, 6);
-//parentnormals = [];
-      var numparentnormals = parentnormals.length;
-      var minmaxnormal = 1.0;
-      polygontreenodes.map(function(polygontreenode){
-        var plane = polygontreenodes[0].getPolygon().plane;
-        var planenormal = plane.normal;
-        var maxnormaldot = -1.0;
-        parentnormals.map(function(parentnormal){
-          var dot = parentnormal.dot(planenormal);
-          if(dot > maxnormaldot) maxnormaldot = dot;
-        });
-        if(maxnormaldot < minmaxnormal)
-        {
-          minmaxnormal = maxnormaldot;
-          bestplane = plane;
-        }
-      });
-*/
+                 var parentnormals = [];
+                 this.getParentPlaneNormals(parentnormals, 6);
+                 //parentnormals = [];
+                 var numparentnormals = parentnormals.length;
+                 var minmaxnormal = 1.0;
+                 polygontreenodes.map(function(polygontreenode){
+                 var plane = polygontreenodes[0].getPolygon().plane;
+                 var planenormal = plane.normal;
+                 var maxnormaldot = -1.0;
+                 parentnormals.map(function(parentnormal){
+                 var dot = parentnormal.dot(planenormal);
+                 if(dot > maxnormaldot) maxnormaldot = dot;
+                 });
+                 if(maxnormaldot < minmaxnormal)
+                 {
+                 minmaxnormal = maxnormaldot;
+                 bestplane = plane;
+                 }
+                 });
+                 */
                 this.plane = bestplane;
             }
             var frontnodes = [];
@@ -4070,12 +4041,12 @@ for solid CAD anyway.
             return distance;
         },
         /*FIXME: has error - origin is not defined, the method is never used
-    closestPoint: function(point) {
-        point = new CSG.Vector2D(point);
-        var vector = point.dot(this.direction());
-        return origin.plus(vector);
-    },
-    */
+         closestPoint: function(point) {
+         point = new CSG.Vector2D(point);
+         var vector = point.dot(this.direction());
+         return origin.plus(vector);
+         },
+         */
 
         // intersection between two lines, returns point as Vector2D
         intersectWithLine: function(line2d) {
@@ -4210,7 +4181,7 @@ for solid CAD anyway.
     };
 
     // Get an orthonormal basis for the standard XYZ planes.
-    // Parameters: the names of two 3D axes. The 2d x axis will map to the first given 3D axis, the 2d y 
+    // Parameters: the names of two 3D axes. The 2d x axis will map to the first given 3D axis, the 2d y
     // axis will map to the second.
     // Prepend the axis with a "-" to invert the direction of this axis.
     // For example: CSG.OrthoNormalBasis.GetCartesian("-Y","Z")
@@ -4298,43 +4269,43 @@ for solid CAD anyway.
     };
 
     /*
-    // test code for CSG.OrthoNormalBasis.GetCartesian()
-    CSG.OrthoNormalBasis.GetCartesian_Test=function() {
-        var axisnames=["X","Y","Z","-X","-Y","-Z"];
-        var axisvectors=[[1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1]];
-        for(var axis1=0; axis1 < 3; axis1++)
-        {
-            for(var axis1inverted=0; axis1inverted < 2; axis1inverted++)
-            {
-                var axis1name=axisnames[axis1+3*axis1inverted];
-                var axis1vector=axisvectors[axis1+3*axis1inverted];
-                for(var axis2=0; axis2 < 3; axis2++)
-                {
-                    if(axis2 != axis1)
-                    {
-                        for(var axis2inverted=0; axis2inverted < 2; axis2inverted++)
-                        {
-                            var axis2name=axisnames[axis2+3*axis2inverted];
-                            var axis2vector=axisvectors[axis2+3*axis2inverted];
-                            var orthobasis=CSG.OrthoNormalBasis.GetCartesian(axis1name, axis2name);
-                            var test1=orthobasis.to3D(new CSG.Vector2D([1,0]));
-                            var test2=orthobasis.to3D(new CSG.Vector2D([0,1]));
-                            var expected1=new CSG.Vector3D(axis1vector);
-                            var expected2=new CSG.Vector3D(axis2vector);
-                            var d1=test1.distanceTo(expected1);
-                            var d2=test2.distanceTo(expected2);
-                            if( (d1 > 0.01) || (d2 > 0.01) )
-                            {
-                                throw new Error("Wrong!");
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        throw new Error("OK");
-    };
-    */
+     // test code for CSG.OrthoNormalBasis.GetCartesian()
+     CSG.OrthoNormalBasis.GetCartesian_Test=function() {
+     var axisnames=["X","Y","Z","-X","-Y","-Z"];
+     var axisvectors=[[1,0,0], [0,1,0], [0,0,1], [-1,0,0], [0,-1,0], [0,0,-1]];
+     for(var axis1=0; axis1 < 3; axis1++)
+     {
+     for(var axis1inverted=0; axis1inverted < 2; axis1inverted++)
+     {
+     var axis1name=axisnames[axis1+3*axis1inverted];
+     var axis1vector=axisvectors[axis1+3*axis1inverted];
+     for(var axis2=0; axis2 < 3; axis2++)
+     {
+     if(axis2 != axis1)
+     {
+     for(var axis2inverted=0; axis2inverted < 2; axis2inverted++)
+     {
+     var axis2name=axisnames[axis2+3*axis2inverted];
+     var axis2vector=axisvectors[axis2+3*axis2inverted];
+     var orthobasis=CSG.OrthoNormalBasis.GetCartesian(axis1name, axis2name);
+     var test1=orthobasis.to3D(new CSG.Vector2D([1,0]));
+     var test2=orthobasis.to3D(new CSG.Vector2D([0,1]));
+     var expected1=new CSG.Vector3D(axis1vector);
+     var expected2=new CSG.Vector3D(axis2vector);
+     var d1=test1.distanceTo(expected1);
+     var d2=test2.distanceTo(expected2);
+     if( (d1 > 0.01) || (d2 > 0.01) )
+     {
+     throw new Error("Wrong!");
+     }
+     }
+     }
+     }
+     }
+     }
+     throw new Error("OK");
+     };
+     */
 
     // The z=0 plane, with the 3D x and y vectors mapped to the 2D x and y vector
     CSG.OrthoNormalBasis.Z0Plane = function() {
@@ -4437,6 +4408,7 @@ for solid CAD anyway.
         var result = point1.x + t * (point2.x - point1.x);
         return result;
     };
+
 
     // Retesselation function for a set of coplanar polygons. See the introduction at the top of
     // this file.
@@ -5081,20 +5053,20 @@ for solid CAD anyway.
     };
 
     /*
-    Construct a (part of a) circle. Parameters:
-      options.center: the center point of the arc (CSG.Vector2D or array [x,y])
-      options.radius: the circle radius (float)
-      options.startangle: the starting angle of the arc, in degrees
-        0 degrees corresponds to [1,0]
-        90 degrees to [0,1]
-        and so on
-      options.endangle: the ending angle of the arc, in degrees
-      options.resolution: number of points per 360 degree of rotation
-      options.maketangent: adds two extra tiny line segments at both ends of the circle
-        this ensures that the gradients at the edges are tangent to the circle
-    Returns a CSG.Path2D. The path is not closed (even if it is a 360 degree arc).
-    close() the resultin path if you want to create a true circle.
-    */
+     Construct a (part of a) circle. Parameters:
+     options.center: the center point of the arc (CSG.Vector2D or array [x,y])
+     options.radius: the circle radius (float)
+     options.startangle: the starting angle of the arc, in degrees
+     0 degrees corresponds to [1,0]
+     90 degrees to [0,1]
+     and so on
+     options.endangle: the ending angle of the arc, in degrees
+     options.resolution: number of points per 360 degree of rotation
+     options.maketangent: adds two extra tiny line segments at both ends of the circle
+     this ensures that the gradients at the edges are tangent to the circle
+     Returns a CSG.Path2D. The path is not closed (even if it is a 360 degree arc).
+     close() the resultin path if you want to create a true circle.
+     */
     CSG.Path2D.arc = function(options) {
         var center = CSG.parseOptionAs2DVector(options, "center", 0);
         var radius = CSG.parseOptionAsFloat(options, "radius", 1);
@@ -5332,20 +5304,20 @@ for solid CAD anyway.
         },
 
         /*
-        options:
-            .resolution // smoothness of the arc (number of segments per 360 degree of rotation)
-            // to create a circular arc:
-            .radius
-            // to create an elliptical arc:
-            .xradius
-            .yradius
-            .xaxisrotation  // the rotation (in degrees) of the x axis of the ellipse with respect to the x axis of our coordinate system
-            // this still leaves 4 possible arcs between the two given points. The following two flags select which one we draw:
-            .clockwise // = true | false (default is false). Two of the 4 solutions draw clockwise with respect to the center point, the other 2 counterclockwise
-            .large     // = true | false (default is false). Two of the 4 solutions are an arc longer than 180 degrees, the other two are <= 180 degrees
-        This implementation follows the SVG arc specs. For the details see 
-        http://www.w3.org/TR/SVG/paths.html#PathDataEllipticalArcCommands
-    */
+         options:
+         .resolution // smoothness of the arc (number of segments per 360 degree of rotation)
+         // to create a circular arc:
+         .radius
+         // to create an elliptical arc:
+         .xradius
+         .yradius
+         .xaxisrotation  // the rotation (in degrees) of the x axis of the ellipse with respect to the x axis of our coordinate system
+         // this still leaves 4 possible arcs between the two given points. The following two flags select which one we draw:
+         .clockwise // = true | false (default is false). Two of the 4 solutions draw clockwise with respect to the center point, the other 2 counterclockwise
+         .large     // = true | false (default is false). Two of the 4 solutions are an arc longer than 180 degrees, the other two are <= 180 degrees
+         This implementation follows the SVG arc specs. For the details see
+         http://www.w3.org/TR/SVG/paths.html#PathDataEllipticalArcCommands
+         */
         appendArc: function(endpoint, options) {
             if (arguments.length < 2) {
                 options = {};
@@ -5574,12 +5546,12 @@ for solid CAD anyway.
     };
 
     /* Construct a circle
-       options:
-         center: a 2D center point
-         radius: a scalar
-         resolution: number of sides per 360 degree rotation
-       returns a CAG object
-    */
+     options:
+     center: a 2D center point
+     radius: a scalar
+     resolution: number of sides per 360 degree rotation
+     returns a CAG object
+     */
     CAG.circle = function(options) {
         options = options || {};
         var center = CSG.parseOptionAs2DVector(options, "center", [0, 0]);
@@ -5600,11 +5572,11 @@ for solid CAD anyway.
     };
 
     /* Construct a rectangle
-       options:
-         center: a 2D center point
-         radius: a 2D vector with width and height
-       returns a CAG object
-    */
+     options:
+     center: a 2D center point
+     radius: a 2D vector with width and height
+     returns a CAG object
+     */
     CAG.rectangle = function(options) {
         options = options || {};
         var c, r;
@@ -5728,7 +5700,7 @@ for solid CAD anyway.
                     return pair.map(function(v) {
                         return v.transform(m);
                     });
-                }); 
+                });
             }
             return pairs;
         },
@@ -5782,7 +5754,7 @@ for solid CAD anyway.
         /*
          * given 2 connectors, this returns all polygons of a "wall" between 2
          * copies of this cag, positioned in 3d space as "bottom" and
-         * "top" plane per connectors toConnector1, and toConnector2, respectively 
+         * "top" plane per connectors toConnector1, and toConnector2, respectively
          */
         _toWallPolygons: function(options) {
             // normals are going to be correct as long as toConn2.point - toConn1.point
@@ -6025,7 +5997,7 @@ for solid CAD anyway.
             return result;
         },
 
-        // extrude the CAG in a certain plane. 
+        // extrude the CAG in a certain plane.
         // Giving just a plane is not enough, multiple different extrusions in the same plane would be possible
         // by rotating around the plane's origin. An additional right-hand vector should be specified as well,
         // and this is exactly a CSG.OrthoNormalBasis.
@@ -6082,7 +6054,7 @@ for solid CAD anyway.
                 normalVector: normalVector.rotateZ(twistangle), flipped: offsetVector.z < 0 ? true:false}));
             // walls
             for (var i = 0; i < twiststeps; i++) {
-                var c1 = new CSG.Connector(offsetVector.times(i / twiststeps), [0, 0, offsetVector.z], 
+                var c1 = new CSG.Connector(offsetVector.times(i / twiststeps), [0, 0, offsetVector.z],
                     normalVector.rotateZ(i * twistangle/twiststeps));
                 var c2 = new CSG.Connector(offsetVector.times((i + 1) / twiststeps), [0, 0, offsetVector.z],
                     normalVector.rotateZ((i + 1) * twistangle/twiststeps));
@@ -6291,13 +6263,13 @@ for solid CAD anyway.
         },
 
         /*
-    cag = cag.overCutInsideCorners(cutterradius);
+         cag = cag.overCutInsideCorners(cutterradius);
 
-    Using a CNC router it's impossible to cut out a true sharp inside corner. The inside corner
-    will be rounded due to the radius of the cutter. This function compensates for this by creating 
-    an extra cutout at each inner corner so that the actual cut out shape will be at least as large
-    as needed.
-    */
+         Using a CNC router it's impossible to cut out a true sharp inside corner. The inside corner
+         will be rounded due to the radius of the cutter. This function compensates for this by creating
+         an extra cutout at each inner corner so that the actual cut out shape will be at least as large
+         as needed.
+         */
         overCutInsideCorners: function(cutterradius) {
             var cag = this.canonicalized();
             // for each vertex determine the 'incoming' side and 'outgoing' side:
@@ -6552,14 +6524,14 @@ for solid CAD anyway.
     CSG.addTransformationMethodsToPrototype(CSG.OrthoNormalBasis.prototype);
 
     /*
-      2D polygons are now supported through the CAG class.
-      With many improvements (see documentation):
-        - shapes do no longer have to be convex
-        - union/intersect/subtract is supported
-        - expand / contract are supported
+     2D polygons are now supported through the CAG class.
+     With many improvements (see documentation):
+     - shapes do no longer have to be convex
+     - union/intersect/subtract is supported
+     - expand / contract are supported
 
-      But we'll keep CSG.Polygon2D as a stub for backwards compatibility
-    */
+     But we'll keep CSG.Polygon2D as a stub for backwards compatibility
+     */
     CSG.Polygon2D = function(points) {
         var cag = CAG.fromPoints(points);
         this.sides = cag.sides;
