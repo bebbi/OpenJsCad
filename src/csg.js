@@ -978,7 +978,7 @@
         },
 
         setColor: function(red, green, blue, alpha) {
-            var newshared = new CSG.Polygon.Shared([red, green, blue, typeof alpha != 'undefined' ? alpha : 1 ]);
+            var newshared = new CSG.Polygon.Shared([red, green, blue, alpha || 1]);
             return this.setShared(newshared);
         },
 
