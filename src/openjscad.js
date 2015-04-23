@@ -147,6 +147,17 @@ OpenJsCad.Viewer.prototype = {
         this.pauseRender_ = true;
         cancelAnimationFrame(this.requestID_);
     },
+    // just a way without requiring preserveDrawingBuffer
+    getSnapShot: function() {
+        this.renderer_.render(this.scene_, this.camera_);
+        // see http://29a.ch/2011/9/11/uploading-from-html5-canvas-to-imgur-data-uri
+        try {
+          var img = renderer.domElement.toDataURL();
+        } catch(e) {
+          var img = canvas.toDataURL().split(',')[1];
+        }
+        return img;
+    },
     refreshRenderer: function(bool_noWebGL) {
         this.cancelAnimate();
         if (!bool_noWebGL) {
